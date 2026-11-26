@@ -14,9 +14,9 @@ from runner import load_users, run_batch
 
 def test_encrypt_decrypt_roundtrip():
     key = generate_key()
-    sample = [{"name": "Alice", "username": "a@b.com", "password": "pw", "enabled": True}]
+    sample = [{"name": "Alice", "username": "a@b.com", "password": "super-secret-pw-123", "enabled": True}]
     token = encrypt_users(sample, key)
-    assert b"pw" not in token
+    assert b"super-secret-pw-123" not in token
     assert decrypt_users(token, key) == sample
 
 

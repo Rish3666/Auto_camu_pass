@@ -59,18 +59,23 @@ pip install -r requirements.txt
 
 ---
 
-## 4. Release Process (Chrome Extension)
+## 4. Release Process & Versioning (Chrome Extension)
 Friends download the extension directly from **GitHub Releases** (no `git clone` required).
+
+- **Versioning Scheme:**
+  - `0.0.x` — Alpha releases (pre-release)
+  - `0.1.x` — Beta releases (pre-release)
+  - `1.0.0+` — Stable releases
 
 To publish a new extension release:
 1. Bump `"version"` in `extension/manifest.json`.
 2. Update the **Changelog** section at the bottom of this file.
-3. Commit and push to `main`, then create and push a version tag (e.g. `v1.0.1`):
+3. Commit and push to `main`, then create and push a version tag (e.g. `v0.1.1`):
    ```bash
-   git tag v1.0.1
-   git push origin v1.0.1
+   git tag v0.1.1
+   git push origin v0.1.1
    ```
-   `.github/workflows/release_extension.yml` will automatically zip `extension/` and publish the GitHub Release.
+   `.github/workflows/release_extension.yml` will automatically zip `extension/` and publish the GitHub Release (marking `v0.*` as pre-release).
 
 ---
 
@@ -88,7 +93,10 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
-- **2026-11-27 (`v1.0.0-alpha.15`):**
+- **2026-11-27 (`v0.1.0` — Beta 1):**
+  - Promoted the extension from Alpha (`v0.0.x`) to **Beta 1 (`v0.1.0`)**.
+  - Updated versioning scheme (`0.0.x` = Alpha, `0.1.x` = Beta, `1.0.0+` = Stable) in `AGENTS.md`, `manifest.json`, and `.github/workflows/release_extension.yml`.
+- **2026-11-27 (`v0.0.15`):**
   - Updated `extension/background.js` (`getWeekendDates()`) and `extension/popup/popup.js` so the Weekend Gate Pass always targets **Friday (Out date) → Sunday (In date)** whether triggered on Thursday or Friday, and deduplicates against that weekend's Friday date.
   - Cleaned up the Dry-run status message (removed temporary `sample=...` debug JSON).
 - **2026-11-27 (`v1.0.0-alpha.14`):**
