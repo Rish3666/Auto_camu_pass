@@ -146,6 +146,61 @@ def get_user(
     return _row_to_user(row, fernet, include_password=include_password)  # type: ignore[arg-type]
 
 
+def update_user_fields(
+    telegram_user_id: int,
+    *,
+    name: str | None = None,
+    camu_username: str | None = None,
+    camu_password: str | None = None,
+    pass_type: str | None = None,
+    reason: str | None = None,
+    out_time: str | None = None,
+    in_time: str | None = None,
+    db_path: Path = Path("data/users.db"),
+    secret_key: str | None = None,
+) -> bool:
+    """Update one or more fields for an existing registered user. Returns True if user existed."""
+    init_db(db_path)
+    updates: list[str] = []
+    params: list[Any] = []
+    if name is not None:
+        updates.append("name = ?")
+        params.append(name)
+    if camu_username is not None:
+        updates.append("camu_username = ?")
+        params.append(camu_username)
+    if camu_password is not None:
+        fernet = _get_fernet(secret_key)
+        updates.append("camu_password_enc = ?")
+        params.append(fernet.encrypt(camu_password.encode("utf-8")))
+    if pass_type is not None:
+        updates.append("pass_type = ?")
+        params.append(pass_type)
+    if reason is not None:
+        updates.append("reason = ?")
+        params.append(reason)
+    if out_time is not None:
+        updates.append("out_time = ?")
+        params.append(out_time)
+    if in_time is not None:
+        updates.append("in_time = ?")
+        params.append(in_time)
+
+    if not updates:
+        return False
+
+    updates.append("updated_at = ?")
+    params.append(datetime.now(timezone.utc).isoformat())
+    params.append(telegram_user_id)
+
+    with _connect(db_path) as conn:
+        cur = conn.execute(
+            f"UPDATE users SET {', '.join(updates)} WHERE telegram_user_id = ?",
+            tuple(params),
+        )
+        return cur.rowcount > 0
+
+
 def set_enabled(
     telegram_user_id: int,
     enabled: bool,

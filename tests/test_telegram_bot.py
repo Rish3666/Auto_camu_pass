@@ -214,3 +214,45 @@ def test_camu_client_json_api_payload_and_pass_resolution():
     assert payload["timezoneOffSet"] == 330
     assert payload["PerId"] == "stu123"
 
+
+@pytest.mark.asyncio
+async def test_register_inline_buttons_and_update_command(tmp_path, monkeypatch):
+    db_file = tmp_path / "bot.db"
+    key = generate_key()
+    monkeypatch.setattr(telegram_bot, "DB_PATH", db_file)
+    monkeypatch.setenv("CAMU_SECRET_KEY", key)
+
+    ctx = _make_context()
+    await telegram_bot.register_start(_make_update(), ctx)
+    await telegram_bot.register_name(_make_update(text="Alice"), ctx)
+    await telegram_bot.register_username(_make_update(text="alice@c.edu"), ctx)
+    await telegram_bot.register_password(_make_update(text="pw1"), ctx)
+
+    # Tap inline buttons for Q4, Q5, Q6
+    def _cb_update(data: str):
+        msg = SimpleNamespace(reply_text=AsyncMock())
+        q = SimpleNamespace(data=data, answer=AsyncMock(), edit_message_text=AsyncMock(), message=msg)
+        return SimpleNamespace(
+            effective_user=SimpleNamespace(id=42),
+            effective_chat=SimpleNamespace(id=42),
+            callback_query=q,
+        )
+
+    assert await telegram_bot.register_pass_type_cb(_cb_update("reg:pass:Week End Gate Pass"), ctx) == telegram_bot.ASK_REASON
+    assert await telegram_bot.register_reason_cb(_cb_update("reg:reason:Weekend outing"), ctx) == telegram_bot.ASK_TIMES
+    assert await telegram_bot.register_times_cb(_cb_update("reg:times:06:00 20:00"), ctx) == telegram_bot.ConversationHandler.END
+
+    saved = get_user(42, db_path=db_file)
+    assert saved["pass_type"] == "Week End Gate Pass"
+    assert saved["reason"] == "Weekend outing"
+    assert saved["out_time"] == "06:00"
+    assert saved["in_time"] == "20:00"
+
+    # Test /update command updating just the reason
+    upd_ctx = _make_context()
+    assert await telegram_bot.update_start(_make_update(), upd_ctx) == telegram_bot.UPD_CHOOSE
+    assert await telegram_bot.update_choose_cb(_cb_update("upd:reason"), upd_ctx) == telegram_bot.UPD_VALUE
+    assert await telegram_bot.update_value_text(_make_update(text="Going home"), upd_ctx) == telegram_bot.ConversationHandler.END
+    assert get_user(42, db_path=db_file)["reason"] == "Going home"
+
+

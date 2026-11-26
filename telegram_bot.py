@@ -30,6 +30,7 @@ from db import (
     list_active_users,
     record_submission_status,
     set_enabled,
+    update_user_fields,
     upsert_user,
 )
 
@@ -41,8 +42,18 @@ DEFAULT_REASON = "Weekend outing"
 DEFAULT_OUT_TIME = "06:00"
 DEFAULT_IN_TIME = "20:00"
 
-# Conversation states for /register
-ASK_NAME, ASK_USERNAME, ASK_PASSWORD, ASK_PASS_TYPE, ASK_REASON, ASK_TIMES = range(6)
+# Conversation states for /register and /update
+(
+    ASK_NAME,
+    ASK_USERNAME,
+    ASK_PASSWORD,
+    ASK_PASS_TYPE,
+    ASK_REASON,
+    ASK_TIMES,
+    UPD_CHOOSE,
+    UPD_VALUE,
+    UPD_PASSWORD,
+) = range(9)
 
 # Per-user in-flight lock set to prevent concurrent Playwright launches for the same account
 _IN_FLIGHT_USERS: set[int] = set()
@@ -148,15 +159,49 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Set up once and your gate pass will be submitted automatically every "
         "<b>Thursday &amp; Friday (09:00–23:00 IST)</b>.\n\n"
         "<b>Commands:</b>\n"
-        "/register — Add or update your Camu credentials &amp; pass defaults\n"
+        "/register — Set up your Camu credentials &amp; pass defaults\n"
+        "/update — Update your name, credentials, pass type, reason, or times\n"
         "/status — View your settings &amp; quick action buttons\n"
         "/test — Run a dry-run (fills form &amp; sends screenshot without submitting)\n"
         "/submit — Submit your gate pass right now\n"
         "/pause — Pause weekly auto-submit\n"
         "/resume — Resume weekly auto-submit\n"
         "/delete — Remove your account and credentials permanently\n"
-        "/cancel — Cancel an active registration",
+        "/cancel — Cancel an active registration or update",
         parse_mode=ParseMode.HTML,
+    )
+
+
+def _pass_type_markup() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(DEFAULT_PASS_TYPE, callback_data=f"reg:pass:{DEFAULT_PASS_TYPE}"),
+                InlineKeyboardButton("Skip (Default)", callback_data="reg:pass:skip"),
+            ]
+        ]
+    )
+
+
+def _reason_markup() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(DEFAULT_REASON, callback_data=f"reg:reason:{DEFAULT_REASON}"),
+                InlineKeyboardButton("Skip (Default)", callback_data="reg:reason:skip"),
+            ]
+        ]
+    )
+
+
+def _times_markup() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(f"{DEFAULT_OUT_TIME} – {DEFAULT_IN_TIME}", callback_data=f"reg:times:{DEFAULT_OUT_TIME} {DEFAULT_IN_TIME}"),
+                InlineKeyboardButton("Skip (Default)", callback_data="reg:times:skip"),
+            ]
+        ]
     )
 
 
@@ -203,49 +248,79 @@ async def register_password(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except Exception:
         pass
     await update.message.reply_text(
-        f"4️⃣ Enter your <b>Gate Pass type</b> (or send <code>skip</code> for <code>{_esc(DEFAULT_PASS_TYPE)}</code>):",
+        f"4️⃣ Choose your <b>Gate Pass type</b> below, or type a custom one:",
         parse_mode=ParseMode.HTML,
+        reply_markup=_pass_type_markup(),
     )
     return ASK_PASS_TYPE
 
 
-async def register_pass_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    val = (update.message.text or "").strip()
+async def _apply_pass_type(target_msg, context: ContextTypes.DEFAULT_TYPE, val: str) -> int:
     context.user_data["pass_type"] = DEFAULT_PASS_TYPE if not val or val.lower() == "skip" else val
-    await update.message.reply_text(
-        f"5️⃣ Enter your default <b>reason</b> (or send <code>skip</code> for <code>{_esc(DEFAULT_REASON)}</code>):",
+    await target_msg.reply_text(
+        f"5️⃣ Choose your default <b>reason</b> below, or type a custom one:",
         parse_mode=ParseMode.HTML,
+        reply_markup=_reason_markup(),
     )
     return ASK_REASON
 
 
-async def register_reason(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def register_pass_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     val = (update.message.text or "").strip()
+    return await _apply_pass_type(update.message, context, val)
+
+
+async def register_pass_type_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    val = (query.data or "").removeprefix("reg:pass:")
+    chosen = DEFAULT_PASS_TYPE if val.lower() == "skip" else val
+    await query.edit_message_text(f"4️⃣ Gate Pass type: <code>{_esc(chosen)}</code>", parse_mode=ParseMode.HTML)
+    return await _apply_pass_type(query.message, context, chosen)
+
+
+async def _apply_reason(target_msg, context: ContextTypes.DEFAULT_TYPE, val: str) -> int:
     context.user_data["reason"] = DEFAULT_REASON if not val or val.lower() == "skip" else val
-    await update.message.reply_text(
-        "6️⃣ Enter <b>Out and In time</b> in 24h format separated by space "
-        f"(e.g. <code>{DEFAULT_OUT_TIME} {DEFAULT_IN_TIME}</code>, or <code>skip</code> for default):",
+    await target_msg.reply_text(
+        "6️⃣ Choose <b>Out and In time</b> below, or type 24h format separated by space "
+        f"(e.g. <code>{DEFAULT_OUT_TIME} {DEFAULT_IN_TIME}</code>):",
         parse_mode=ParseMode.HTML,
+        reply_markup=_times_markup(),
     )
     return ASK_TIMES
 
 
-async def register_times(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def register_reason(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     val = (update.message.text or "").strip()
+    return await _apply_reason(update.message, context, val)
+
+
+async def register_reason_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    val = (query.data or "").removeprefix("reg:reason:")
+    chosen = DEFAULT_REASON if val.lower() == "skip" else val
+    await query.edit_message_text(f"5️⃣ Reason: <code>{_esc(chosen)}</code>", parse_mode=ParseMode.HTML)
+    return await _apply_reason(query.message, context, chosen)
+
+
+async def _finish_register_times(update: Update, target_msg, context: ContextTypes.DEFAULT_TYPE, val: str) -> int:
     out_time, in_time = DEFAULT_OUT_TIME, DEFAULT_IN_TIME
     if val and val.lower() != "skip":
         parts = val.split()
         if len(parts) != 2:
-            await update.message.reply_text(
-                f"Please send two times like <code>{DEFAULT_OUT_TIME} {DEFAULT_IN_TIME}</code> or <code>skip</code>.",
+            await target_msg.reply_text(
+                f"Please send two times like <code>{DEFAULT_OUT_TIME} {DEFAULT_IN_TIME}</code> or tap a button below.",
                 parse_mode=ParseMode.HTML,
+                reply_markup=_times_markup(),
             )
             return ASK_TIMES
         ok, err_msg = validate_time_pair(parts[0], parts[1])
         if not ok:
-            await update.message.reply_text(
-                f"{_esc(err_msg)} Try again (e.g. <code>{DEFAULT_OUT_TIME} {DEFAULT_IN_TIME}</code>) or send <code>skip</code>.",
+            await target_msg.reply_text(
+                f"{_esc(err_msg)} Try again (e.g. <code>{DEFAULT_OUT_TIME} {DEFAULT_IN_TIME}</code>) or tap a button below.",
                 parse_mode=ParseMode.HTML,
+                reply_markup=_times_markup(),
             )
             return ASK_TIMES
         out_time, in_time = parts[0], parts[1]
@@ -263,17 +338,188 @@ async def register_times(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         db_path=DB_PATH,
     )
     context.user_data.clear()
-    await update.message.reply_text(
+    await target_msg.reply_text(
         "✅ <b>Registered!</b> Your credentials are encrypted and saved.\n"
-        "Run /test to verify your login &amp; form with a dry-run screenshot.",
+        "Run /test to verify your login &amp; JSON API dry-run.",
         parse_mode=ParseMode.HTML,
     )
     return ConversationHandler.END
 
 
+async def register_times(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    val = (update.message.text or "").strip()
+    return await _finish_register_times(update, update.message, context, val)
+
+
+async def register_times_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    val = (query.data or "").removeprefix("reg:times:")
+    display = f"{DEFAULT_OUT_TIME} – {DEFAULT_IN_TIME}" if val.lower() == "skip" else val.replace(" ", " – ")
+    await query.edit_message_text(f"6️⃣ Time: <code>{_esc(display)}</code>", parse_mode=ParseMode.HTML)
+    return await _finish_register_times(update, query.message, context, val)
+
+
 async def register_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
-    await update.message.reply_text("Registration cancelled.")
+    msg = update.effective_message if hasattr(update, "effective_message") and update.effective_message else update.message
+    await msg.reply_text("Cancelled.")
+    return ConversationHandler.END
+
+
+async def update_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = get_user(update.effective_user.id, db_path=DB_PATH)
+    if not user:
+        await update.message.reply_text("You are not registered yet. Send /register first.")
+        return ConversationHandler.END
+
+    context.user_data.clear()
+    keyboard = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("👤 Display Name", callback_data="upd:name"),
+                InlineKeyboardButton("🔐 Camu Login", callback_data="upd:creds"),
+            ],
+            [
+                InlineKeyboardButton("🎫 Pass Type", callback_data="upd:pass_type"),
+                InlineKeyboardButton("📝 Reason", callback_data="upd:reason"),
+            ],
+            [
+                InlineKeyboardButton("⏰ Out / In Time", callback_data="upd:times"),
+                InlineKeyboardButton("❌ Cancel", callback_data="upd:cancel"),
+            ],
+        ]
+    )
+    await update.message.reply_text(
+        "What would you like to <b>update</b>?",
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
+    )
+    return UPD_CHOOSE
+
+
+async def update_choose_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    field = (query.data or "").removeprefix("upd:")
+
+    if field == "cancel":
+        await query.edit_message_text("Update cancelled.")
+        return ConversationHandler.END
+
+    context.user_data["update_field"] = field
+    if field == "name":
+        await query.edit_message_text("Enter your new <b>display name</b>:", parse_mode=ParseMode.HTML)
+    elif field == "creds":
+        await query.edit_message_text("Enter your new <b>Camu username / email</b>:", parse_mode=ParseMode.HTML)
+    elif field == "pass_type":
+        await query.edit_message_text(
+            "Choose a new <b>Gate Pass type</b> below, or type a custom one:",
+            parse_mode=ParseMode.HTML,
+            reply_markup=_pass_type_markup(),
+        )
+    elif field == "reason":
+        await query.edit_message_text(
+            "Choose a new default <b>reason</b> below, or type a custom one:",
+            parse_mode=ParseMode.HTML,
+            reply_markup=_reason_markup(),
+        )
+    elif field == "times":
+        await query.edit_message_text(
+            f"Choose new <b>Out and In time</b> below, or type 24h format (e.g. <code>{DEFAULT_OUT_TIME} {DEFAULT_IN_TIME}</code>):",
+            parse_mode=ParseMode.HTML,
+            reply_markup=_times_markup(),
+        )
+    return UPD_VALUE
+
+
+async def _apply_update_value(update: Update, target_msg, context: ContextTypes.DEFAULT_TYPE, val: str) -> int:
+    field = context.user_data.get("update_field", "")
+    uid = update.effective_user.id
+
+    if field == "name":
+        if not val:
+            await target_msg.reply_text("Please enter a non-empty display name.")
+            return UPD_VALUE
+        update_user_fields(uid, name=val, db_path=DB_PATH)
+        summary = f"Display name updated to <code>{_esc(val)}</code>."
+    elif field == "creds":
+        if not val:
+            await target_msg.reply_text("Please enter a valid Camu username / email.")
+            return UPD_VALUE
+        context.user_data["new_username"] = val
+        await target_msg.reply_text(
+            "Now enter your new <b>Camu password</b>:\n<i>(Your message will be deleted immediately.)</i>",
+            parse_mode=ParseMode.HTML,
+        )
+        return UPD_PASSWORD
+    elif field == "pass_type":
+        chosen = DEFAULT_PASS_TYPE if not val or val.lower() == "skip" else val
+        update_user_fields(uid, pass_type=chosen, db_path=DB_PATH)
+        summary = f"Pass type updated to <code>{_esc(chosen)}</code>."
+    elif field == "reason":
+        chosen = DEFAULT_REASON if not val or val.lower() == "skip" else val
+        update_user_fields(uid, reason=chosen, db_path=DB_PATH)
+        summary = f"Reason updated to <code>{_esc(chosen)}</code>."
+    elif field == "times":
+        out_t, in_t = DEFAULT_OUT_TIME, DEFAULT_IN_TIME
+        if val and val.lower() != "skip":
+            parts = val.split()
+            if len(parts) != 2:
+                await target_msg.reply_text(
+                    f"Please send two times like <code>{DEFAULT_OUT_TIME} {DEFAULT_IN_TIME}</code> or tap a button.",
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=_times_markup(),
+                )
+                return UPD_VALUE
+            ok, err_msg = validate_time_pair(parts[0], parts[1])
+            if not ok:
+                await target_msg.reply_text(
+                    f"{_esc(err_msg)} Try again or tap a button.",
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=_times_markup(),
+                )
+                return UPD_VALUE
+            out_t, in_t = parts[0], parts[1]
+        update_user_fields(uid, out_time=out_t, in_time=in_t, db_path=DB_PATH)
+        summary = f"Time updated to <code>{_esc(out_t)} – {_esc(in_t)}</code>."
+    else:
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    context.user_data.clear()
+    await target_msg.reply_text(f"✅ {summary}", parse_mode=ParseMode.HTML)
+    return ConversationHandler.END
+
+
+async def update_value_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    val = (update.message.text or "").strip()
+    return await _apply_update_value(update, update.message, context, val)
+
+
+async def update_value_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    data = query.data or ""
+    val = data.split(":", 2)[-1] if ":" in data else data
+    await query.edit_message_text("Updating…")
+    return await _apply_update_value(update, query.message, context, val)
+
+
+async def update_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    pw = update.message.text or ""
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+    update_user_fields(
+        update.effective_user.id,
+        camu_username=context.user_data["new_username"],
+        camu_password=pw,
+        db_path=DB_PATH,
+    )
+    context.user_data.clear()
+    await update.message.reply_text("✅ <b>Camu credentials updated!</b> Run /test to verify.", parse_mode=ParseMode.HTML)
     return ConversationHandler.END
 
 
@@ -443,14 +689,15 @@ async def _post_init(app: Application) -> None:
     """Register slash command descriptions in Telegram's command menu."""
     await app.bot.set_my_commands(
         [
-            BotCommand("register", "Add or update Camu credentials & defaults"),
+            BotCommand("register", "Set up your Camu credentials & defaults"),
+            BotCommand("update", "Update a saved setting (name, login, pass, reason, time)"),
             BotCommand("status", "View your saved settings & action buttons"),
-            BotCommand("test", "Run a dry-run with screenshot (no submission)"),
+            BotCommand("test", "Run a dry-run (no submission)"),
             BotCommand("submit", "Submit your gate pass right now"),
             BotCommand("pause", "Pause weekly auto-submit"),
             BotCommand("resume", "Resume weekly auto-submit"),
             BotCommand("delete", "Delete your account and credentials"),
-            BotCommand("cancel", "Cancel current registration"),
+            BotCommand("cancel", "Cancel current registration or update"),
         ]
     )
 
@@ -472,15 +719,38 @@ def build_application() -> Application:
             ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_name)],
             ASK_USERNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_username)],
             ASK_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_password)],
-            ASK_PASS_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_pass_type)],
-            ASK_REASON: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_reason)],
-            ASK_TIMES: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_times)],
+            ASK_PASS_TYPE: [
+                CallbackQueryHandler(register_pass_type_cb, pattern=r"^reg:pass:"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, register_pass_type),
+            ],
+            ASK_REASON: [
+                CallbackQueryHandler(register_reason_cb, pattern=r"^reg:reason:"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, register_reason),
+            ],
+            ASK_TIMES: [
+                CallbackQueryHandler(register_times_cb, pattern=r"^reg:times:"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, register_times),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", register_cancel)],
+    )
+
+    update_handler = ConversationHandler(
+        entry_points=[CommandHandler("update", update_start)],
+        states={
+            UPD_CHOOSE: [CallbackQueryHandler(update_choose_cb, pattern=r"^upd:")],
+            UPD_VALUE: [
+                CallbackQueryHandler(update_value_cb, pattern=r"^reg:"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, update_value_text),
+            ],
+            UPD_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, update_password)],
         },
         fallbacks=[CommandHandler("cancel", register_cancel)],
     )
 
     app.add_handler(CommandHandler(["start", "help"], start_cmd))
     app.add_handler(conv_handler)
+    app.add_handler(update_handler)
     app.add_handler(CommandHandler("status", status_cmd))
     app.add_handler(CommandHandler("pause", pause_cmd))
     app.add_handler(CommandHandler("resume", resume_cmd))
