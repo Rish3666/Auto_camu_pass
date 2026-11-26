@@ -7,58 +7,88 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>Auto Camu Pass</h1>
-      <span class="subtitle">Tuesdays 09:00–23:00</span>
+  <div class="shell">
+    <header class="header">
+      <div class="header-left">
+        <h1>Auto Camu Pass</h1>
+        <p class="muted">Weekly gate pass automation</p>
+      </div>
+      <span class="badge badge-outline">Tue · 09–23</span>
     </header>
 
-    <div id="status-banner" class="status-banner">Not configured yet</div>
-    <div id="profile-banner" class="status-banner" style="display: none;"></div>
+    <!-- Camu Session / Profile Sync Card -->
+    <section class="card">
+      <div class="card-row">
+        <div class="profile-info">
+          <div class="avatar" id="profile-avatar">?</div>
+          <div>
+            <div class="profile-name" id="profile-name">Camu not synced</div>
+            <div class="profile-meta" id="profile-meta">Open Camu & log in to fetch details</div>
+          </div>
+        </div>
+        <button id="sync-btn" type="button" class="btn btn-outline btn-sm">Open Camu</button>
+      </div>
+    </section>
 
-    <form id="settings-form">
-      <label class="toggle-row">
-        <span>Auto-submit on Tuesdays</span>
-        <input type="checkbox" id="enabled" />
+    <div id="status-banner" class="status-line">Ready</div>
+
+    <form id="settings-form" class="form">
+      <!-- shadcn Switch row -->
+      <label class="switch-card" for="enabled">
+        <div>
+          <div class="switch-title">Auto-submit on Tuesdays</div>
+          <div class="switch-desc">Checks every 15m while Chrome is open</div>
+        </div>
+        <span class="switch">
+          <input type="checkbox" id="enabled" />
+          <span class="slider"></span>
+        </span>
       </label>
 
-      <label>
-        Camu Username / Email
-        <input type="text" id="username" placeholder="student@college.edu" required />
-      </label>
+      <div class="separator"></div>
 
-      <label>
-        Camu Password
-        <input type="password" id="password" placeholder="Stored locally only" required />
-      </label>
-
-      <label>
-        Pass Type
-        <input type="text" id="passType" placeholder="Day Outing" value="Day Outing" />
-      </label>
-
-      <label>
-        Reason
-        <input type="text" id="reason" placeholder="Personal work" value="Personal work" />
-      </label>
-
-      <div class="time-row">
-        <label>
-          Out Time
-          <input type="time" id="outTime" value="10:00" />
-        </label>
-        <label>
-          In Time
-          <input type="time" id="inTime" value="20:00" />
-        </label>
+      <div class="grid-2">
+        <div class="field">
+          <label for="passType">Pass type</label>
+          <input type="text" id="passType" placeholder="Day Outing" value="Day Outing" />
+        </div>
+        <div class="field">
+          <label for="reason">Reason</label>
+          <input type="text" id="reason" placeholder="Personal work" value="Personal work" />
+        </div>
       </div>
 
-      <button type="submit" class="btn primary">Save Settings</button>
+      <div class="grid-2">
+        <div class="field">
+          <label for="outTime">Out time</label>
+          <input type="time" id="outTime" value="10:00" />
+        </div>
+        <div class="field">
+          <label for="inTime">In time</label>
+          <input type="time" id="inTime" value="20:00" />
+        </div>
+      </div>
+
+      <details class="details">
+        <summary>Auto-login credentials <span class="muted">(optional)</span></summary>
+        <div class="details-body">
+          <div class="field">
+            <label for="username">Camu username / email</label>
+            <input type="text" id="username" placeholder="student@college.edu" />
+          </div>
+          <div class="field">
+            <label for="password">Camu password</label>
+            <input type="password" id="password" placeholder="Stored locally in Chrome" />
+          </div>
+        </div>
+      </details>
+
+      <button type="submit" class="btn btn-primary btn-full">Save changes</button>
     </form>
 
-    <div class="actions">
-      <button id="dry-run-btn" type="button" class="btn secondary">Dry-Run Test</button>
-      <button id="submit-now-btn" type="button" class="btn accent">Submit Now</button>
+    <div class="grid-2 footer-actions">
+      <button id="dry-run-btn" type="button" class="btn btn-outline">Dry-run</button>
+      <button id="submit-now-btn" type="button" class="btn btn-secondary">Submit now</button>
     </div>
   </div>
   <script src="popup.js"></script>

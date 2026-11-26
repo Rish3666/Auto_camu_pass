@@ -14,7 +14,6 @@ function getLocalDateString(now = new Date()) {
 }
 
 function isTuesdayWindow(now = new Date()) {
-  // JS getDay(): 0 = Sun, 1 = Mon, 2 = Tue
   const isTuesday = now.getDay() === 2;
   const hour = now.getHours();
   return isTuesday && hour >= 9 && hour < 23;
@@ -61,6 +60,34 @@ async function waitForTabComplete(tabId, timeoutMs = 25000) {
   });
 }
 
+async function openOrFocusCamuAndSync() {
+  const existingTabs = await chrome.tabs.query({ url: 'https://student.camu.in/*' });
+  let tab;
+  if (existingTabs.length > 0) {
+    tab = existingTabs[0];
+    await chrome.tabs.update(tab.id, { active: true });
+    await chrome.windows.update(tab.windowId, { focused: true });
+  } else {
+    tab = await chrome.tabs.create({ url: CAMU_URL, active: true });
+  }
+
+  await waitForTabComplete(tab.id);
+  await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ['content.js'],
+  });
+
+  try {
+    const res = await chrome.tabs.sendMessage(tab.id, { action: 'SYNC_PROFILE' });
+    if (res?.profile) {
+      await chrome.storage.local.set({ fetchedProfile: res.profile });
+    }
+    return res;
+  } catch (err) {
+    return { ok: false, message: err?.message || 'Camu tab opened. Log in to sync your profile.' };
+  }
+}
+
 async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
   const config = await chrome.storage.local.get([
     'enabled',
@@ -77,10 +104,6 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     return { ok: false, skipped: true, message: 'Auto-submit is paused.' };
   }
 
-  if (!config.username || !config.password) {
-    return { ok: false, message: 'Please save your Camu username and password in the extension popup.' };
-  }
-
   const todayStr = getLocalDateString();
   if (!manual && !dryRun && config.lastSubmittedDate === todayStr) {
     return { ok: true, skipped: true, message: `Already submitted today (${todayStr}).` };
@@ -88,7 +111,7 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
 
   let tab;
   try {
-    tab = await chrome.tabs.create({ url: CAMU_URL, active: false });
+    tab = await chrome.tabs.create({ url: CAMU_URL, active: dryRun });
     await waitForTabComplete(tab.id);
 
     await chrome.scripting.executeScript({
@@ -99,8 +122,8 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     const response = await chrome.tabs.sendMessage(tab.id, {
       action: 'SUBMIT_GATEPASS',
       payload: {
-        username: config.username,
-        password: config.password,
+        username: config.username || '',
+        password: config.password || '',
         passType: config.passType || 'Day Outing',
         reason: config.reason || 'Personal work',
         outTime: config.outTime || '10:00',
@@ -143,7 +166,6 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     return { ok: false, message: msg };
   } finally {
     if (tab?.id && !dryRun) {
-      // Keep tab open during dryRun if user wants to inspect, close otherwise
       try {
         await chrome.tabs.remove(tab.id);
       } catch (_) {}
@@ -174,6 +196,18 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
+    if (message.action === 'PROFILE_SYNCED' && message.profile) {
+      await chrome.storage.local.set({ fetchedProfile: message.profile });
+      sendResponse({ ok: true });
+      return;
+    }
+
+    if (message.action === 'OPEN_CAMU_AND_SYNC') {
+      const result = await openOrFocusCamuAndSync();
+      sendResponse(result);
+      return;
+    }
+
     if (message.action === 'RUN_NOW') {
       const result = await runGatePassSubmission({
         dryRun: Boolean(message.dryRun),
@@ -182,6 +216,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       sendResponse(result);
       return;
     }
+
     sendResponse({ ok: false, message: 'Unknown action.' });
   })();
   return true;

@@ -4,15 +4,26 @@ function setBanner(text) {
   document.getElementById('status-banner').textContent = text;
 }
 
-function setProfileBanner(profile) {
-  const el = document.getElementById('profile-banner');
-  if (!profile || (!profile.name && !profile.rollNo && !profile.studentId)) {
-    el.style.display = 'none';
+function renderProfile(profile) {
+  const avatarEl = document.getElementById('profile-avatar');
+  const nameEl = document.getElementById('profile-name');
+  const metaEl = document.getElementById('profile-meta');
+  const syncBtn = document.getElementById('sync-btn');
+
+  if (!profile || (!profile.name && !profile.rollNo && !profile.studentId && !profile.email)) {
+    avatarEl.textContent = '?';
+    nameEl.textContent = 'Camu not synced';
+    metaEl.textContent = 'Open Camu & log in to fetch details';
+    syncBtn.textContent = 'Open Camu';
     return;
   }
-  const parts = [profile.name, profile.rollNo || profile.studentId, profile.phone].filter(Boolean);
-  el.textContent = `Camu Profile: ${parts.join(' • ')}`;
-  el.style.display = 'block';
+
+  const displayName = profile.name || profile.email || 'Camu Student';
+  avatarEl.textContent = displayName.charAt(0).toUpperCase();
+  nameEl.textContent = displayName;
+  const metaParts = [profile.rollNo || profile.studentId, profile.phone || profile.email].filter(Boolean);
+  metaEl.textContent = metaParts.join(' · ') || 'Synced from Camu session';
+  syncBtn.textContent = 'Re-sync';
 }
 
 async function loadSettings() {
@@ -28,7 +39,7 @@ async function loadSettings() {
   if (data.lastStatus) {
     setBanner(data.lastStatus);
   }
-  setProfileBanner(data.fetchedProfile);
+  renderProfile(data.fetchedProfile);
 }
 
 async function saveSettings(event) {
@@ -44,7 +55,22 @@ async function saveSettings(event) {
   };
 
   await chrome.storage.local.set(payload);
-  setBanner('Settings saved locally.');
+  setBanner('Settings saved.');
+}
+
+async function openCamuAndSync() {
+  const syncBtn = document.getElementById('sync-btn');
+  syncBtn.disabled = true;
+  setBanner('Opening Camu to sync profile...');
+  try {
+    const res = await chrome.runtime.sendMessage({ action: 'OPEN_CAMU_AND_SYNC' });
+    if (res?.profile) renderProfile(res.profile);
+    setBanner(res?.message || 'Open Camu & log in; details will sync automatically.');
+  } catch (err) {
+    setBanner(`Error: ${err.message}`);
+  } finally {
+    syncBtn.disabled = false;
+  }
 }
 
 async function triggerRun(dryRun) {
@@ -56,8 +82,8 @@ async function triggerRun(dryRun) {
 
   try {
     const res = await chrome.runtime.sendMessage({ action: 'RUN_NOW', dryRun });
+    if (res?.profile) renderProfile(res.profile);
     setBanner(res?.message || 'Done.');
-    if (res?.profile) setProfileBanner(res.profile);
   } catch (err) {
     setBanner(`Error: ${err.message}`);
   } finally {
@@ -69,6 +95,7 @@ async function triggerRun(dryRun) {
 document.addEventListener('DOMContentLoaded', async () => {
   await loadSettings();
   document.getElementById('settings-form').addEventListener('submit', saveSettings);
+  document.getElementById('sync-btn').addEventListener('click', openCamuAndSync);
   document.getElementById('dry-run-btn').addEventListener('click', () => triggerRun(true));
   document.getElementById('submit-now-btn').addEventListener('click', () => triggerRun(false));
 });

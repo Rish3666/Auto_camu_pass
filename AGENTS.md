@@ -88,6 +88,10 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-26 (`v1.0.0-alpha.2`):**
+  - Registered `extension/content.js` as a persistent `content_scripts` entry on `https://student.camu.in/*` so opening/logging into Camu automatically syncs student details (`PROFILE_SYNCED`) without requiring a manual test run first.
+  - Added "Open Camu" / "Re-sync" action (`OPEN_CAMU_AND_SYNC`) in `extension/background.js` and recursive storage + DOM profile extraction in `extension/content.js`.
+  - Redesigned the extension popup (`extension/popup/*`) in **shadcn/ui** Zinc dark style (cards, switch toggle, outline/primary buttons, synced profile card, collapsible optional credentials).
 - **2026-11-26 (`v1.0.0-alpha.1`):**
   - Marked extension release as **Alpha** (`prerelease: true` for `alpha`/`beta` tags in `.github/workflows/release_extension.yml`, `version_name: "1.0.0-alpha.1"` in `manifest.json`).
   - Added automatic student profile extraction from the logged-in Camu session (`extractStudentDetailsFromSession()` in `extension/content.js`) to auto-fill student name, ID/roll number, phone, and parent contact into Gate Pass forms and display the fetched profile in the popup.
