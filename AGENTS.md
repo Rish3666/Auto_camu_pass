@@ -88,6 +88,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.0.0-alpha.9`):**
+  - Added live Camu check (`checkCamuSubmittedToday()` via `POST /api/Leave/getAllleave/` + `CHECK_TODAY_STATUS`) so manual gate pass submissions on `student.camu.in` also update the popup **`Submitted`** pin and green `OK` toolbar badge.
 - **2026-11-27 (`v1.0.0-alpha.8`):**
   - Added **Submitted / Not submitted** status pin (`#submitted-pin`) in the popup header and a green `OK` toolbar badge (`chrome.action.setBadgeText`) in `extension/background.js` so users can immediately see whether today's gate pass has been submitted.
 - **2026-11-27 (`v1.0.0-alpha.7`):**

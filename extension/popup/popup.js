@@ -61,6 +61,17 @@ async function loadSettings() {
     setBanner(data.lastStatus);
   }
   renderProfile(data.fetchedProfile);
+
+  // Also check Camu silently so manual submissions show as Submitted
+  try {
+    const live = await chrome.runtime.sendMessage({ action: 'CHECK_TODAY_STATUS' });
+    if (live?.submittedToday) {
+      renderSubmittedPin(getLocalDateString());
+      if (live.source === 'camu_api') {
+        setBanner(`Submitted in Camu (${getLocalDateString()})`);
+      }
+    }
+  } catch (_) {}
 }
 
 async function toggleScript(event) {

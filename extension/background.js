@@ -32,9 +32,59 @@ async function updateActionBadge(submittedToday) {
   }
 }
 
+function isLeaveForDate(leaveObj, targetDateStr) {
+  for (const raw of [leaveObj?.FrDt, leaveObj?.frdt]) {
+    if (!raw) continue;
+    const str = String(raw);
+    if (str.startsWith(targetDateStr)) return true;
+    const parsed = new Date(str);
+    if (!Number.isNaN(parsed.getTime()) && getLocalDateString(parsed) === targetDateStr) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function checkCamuSubmittedToday() {
+  const todayStr = getLocalDateString();
+  const { fetchedProfile, lastSubmittedDate } = await chrome.storage.local.get([
+    'fetchedProfile',
+    'lastSubmittedDate',
+  ]);
+  if (lastSubmittedDate === todayStr) {
+    await updateActionBadge(true);
+    return { submittedToday: true, source: 'local' };
+  }
+  if (!fetchedProfile?.studentId) {
+    await updateActionBadge(false);
+    return { submittedToday: false, source: 'no_profile' };
+  }
+
+  try {
+    const leavesRes = await camuPost('/api/Leave/getAllleave/', {
+      StuID: fetchedProfile.studentId,
+      isFrmReact: true,
+    });
+    const existingLeaves = findFirstArrayOfObjects(leavesRes);
+    const foundToday = existingLeaves.some((lv) => isLeaveForDate(lv, todayStr));
+    if (foundToday) {
+      await chrome.storage.local.set({
+        lastSubmittedDate: todayStr,
+        lastStatus: `Submitted in Camu (${todayStr})`,
+      });
+      await updateActionBadge(true);
+      return { submittedToday: true, source: 'camu_api' };
+    }
+    await updateActionBadge(false);
+    return { submittedToday: false, source: 'camu_api' };
+  } catch (_) {
+    await updateActionBadge(false);
+    return { submittedToday: false, source: 'error' };
+  }
+}
+
 async function syncToolbarBadge() {
-  const { lastSubmittedDate } = await chrome.storage.local.get('lastSubmittedDate');
-  await updateActionBadge(lastSubmittedDate === getLocalDateString());
+  await checkCamuSubmittedToday();
 }
 
 async function ensureAlarm() {
@@ -209,9 +259,7 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
       isFrmReact: true,
     });
     const existingLeaves = findFirstArrayOfObjects(leavesRes);
-    const alreadyExists = existingLeaves.some((lv) =>
-      String(lv.FrDt || lv.frdt || '').startsWith(todayStr)
-    );
+    const alreadyExists = existingLeaves.some((lv) => isLeaveForDate(lv, todayStr));
     if (alreadyExists && !dryRun) {
       const existsMsg = `Pass already exists in Camu for ${todayStr} (skipped duplicate).`;
       await chrome.storage.local.set({
@@ -330,7 +378,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     if (message.action === 'PROFILE_SYNCED' && message.profile) {
       await chrome.storage.local.set({ fetchedProfile: message.profile });
+      await checkCamuSubmittedToday();
       sendResponse({ ok: true });
+      return;
+    }
+
+    if (message.action === 'CHECK_TODAY_STATUS') {
+      const status = await checkCamuSubmittedToday();
+      sendResponse(status);
       return;
     }
 
