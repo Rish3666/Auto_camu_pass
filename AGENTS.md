@@ -93,6 +93,9 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v0.1.4` — Beta 1.4):**
+  - Updated `isCancelledOrRejected()` in `extension/background.js` to detect Camu's abbreviated status codes (`status: "CNCL"`, `"EXP"`, `"REJ"`, `"DEL"`, `"WD"`) and `CancelBool === true`.
+  - Updated `isGatePassEntry()` and `resolvePassType()` to recognize `isGatepass: true` and `passTyCode: "WEEK_END_PASS"`.
 - **2026-11-27 (`v0.1.3` — Beta 1.3):**
   - Added collapsible **Developer mode** (`Copy Camu leaves JSON`) in `extension/popup/*` and `GET_DEBUG_LOGS` in `extension/background.js` so users can copy the exact `getAllleave/` JSON for debugging without extra permissions.
 - **2026-11-27 (`v0.1.2` — Beta 1.2):**

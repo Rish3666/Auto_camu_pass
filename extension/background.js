@@ -45,11 +45,20 @@ async function updateActionBadge(submittedToday) {
 
 function isCancelledOrRejected(leaveObj) {
   if (!leaveObj || typeof leaveObj !== 'object') return false;
-  if (leaveObj.isCncl === true || leaveObj.isCancelled === true || leaveObj.isDeleted === true) {
+  if (
+    leaveObj.isCncl === true ||
+    leaveObj.isCancelled === true ||
+    leaveObj.CancelBool === true ||
+    leaveObj.isDeleted === true
+  ) {
     return true;
   }
   const stFl = String(leaveObj.StFl || leaveObj.stFl || '').trim().toUpperCase();
   if (stFl && stFl !== 'A') {
+    return true;
+  }
+  const shortStatus = String(leaveObj.status || leaveObj.Status || leaveObj.Stus || '').trim().toUpperCase();
+  if (['CNCL', 'EXP', 'REJ', 'DEL', 'WD'].includes(shortStatus)) {
     return true;
   }
   for (const [key, val] of Object.entries(leaveObj)) {
@@ -66,8 +75,10 @@ function isGatePassEntry(leaveObj) {
   if (leaveObj.GateOutPass === false || leaveObj.GateOutPass === 'false') return false;
   if (isCancelledOrRejected(leaveObj)) return false;
   return Boolean(
-    leaveObj.GateOutPass === true ||
+    leaveObj.isGatepass === true ||
+      leaveObj.GateOutPass === true ||
       leaveObj.GateOutPass === 'true' ||
+      leaveObj.passTyCode ||
       leaveObj.passTy ||
       leaveObj.PassTy ||
       leaveObj.passCd
@@ -244,8 +255,8 @@ function findFirstArrayOfObjects(root, depth = 0) {
 }
 
 function resolvePassType(typesList, desiredLabel, existingLeaves = []) {
-  const pastPass = existingLeaves.find((lv) => isGatePassEntry(lv) && (lv.passTy || lv.PassTy));
-  const pastPassTy = pastPass ? String(pastPass.passTy || pastPass.PassTy).trim() : '';
+  const pastPass = existingLeaves.find((lv) => isGatePassEntry(lv) && (lv.passTyCode || lv.passTy || lv.PassTy));
+  const pastPassTy = pastPass ? String(pastPass.passTyCode || pastPass.passTy || pastPass.PassTy).trim() : '';
 
   if (!typesList.length) {
     return {
