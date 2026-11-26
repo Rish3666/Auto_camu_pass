@@ -32,6 +32,17 @@ async function updateActionBadge(submittedToday) {
   }
 }
 
+function isGatePassEntry(leaveObj) {
+  return Boolean(
+    leaveObj &&
+      (leaveObj.GateOutPass === true ||
+        leaveObj.GateOutPass === 'true' ||
+        leaveObj.passTy ||
+        leaveObj.PassTy ||
+        leaveObj.passCd)
+  );
+}
+
 function isLeaveForDate(leaveObj, targetDateStr) {
   for (const raw of [leaveObj?.FrDt, leaveObj?.frdt]) {
     if (!raw) continue;
@@ -66,7 +77,9 @@ async function checkCamuSubmittedToday() {
       isFrmReact: true,
     });
     const existingLeaves = findFirstArrayOfObjects(leavesRes);
-    const foundToday = existingLeaves.some((lv) => isLeaveForDate(lv, todayStr));
+    const foundToday = existingLeaves.some(
+      (lv) => isGatePassEntry(lv) && isLeaveForDate(lv, todayStr)
+    );
     if (foundToday) {
       await chrome.storage.local.set({
         lastSubmittedDate: todayStr,
@@ -194,12 +207,18 @@ function findFirstArrayOfObjects(root, depth = 0) {
 }
 
 function resolvePassType(typesList, desiredLabel, existingLeaves = []) {
-  // 1. Check past gate passes in getAllleave/ for a known working passTy
-  const pastPass = existingLeaves.find((lv) => lv && (lv.passTy || lv.PassTy) && lv.GateOutPass);
+  const pastPass = existingLeaves.find((lv) => isGatePassEntry(lv) && (lv.passTy || lv.PassTy));
   const pastPassTy = pastPass ? String(pastPass.passTy || pastPass.PassTy).trim() : '';
 
   if (!typesList.length) {
-    return { id: pastPassTy, label: pastPassTy, allLabels: [], rawSample: null };
+    return {
+      id: pastPassTy,
+      label: pastPassTy,
+      allLabels: [],
+      rawSample: null,
+      gateOutPassVal: pastPass?.GateOutPass ?? 'true',
+      lvTyVal: pastPass?.LvTy || 'Leave',
+    };
   }
 
   const getLabel = (item) =>
@@ -242,14 +261,17 @@ function resolvePassType(typesList, desiredLabel, existingLeaves = []) {
   const target = (desiredLabel || '').trim().toLowerCase();
   const match = typesList.find((item) => {
     const lbl = getLabel(item).toLowerCase();
-    return target && lbl && (lbl === target || lbl.includes(target) || target.includes(lbl));
+    const id = getId(item).toLowerCase();
+    return target && ((lbl && (lbl === target || lbl.includes(target) || target.includes(lbl))) || id === target);
   });
   const chosen = match || typesList[0];
   return {
-    id: pastPassTy || getId(chosen),
+    id: getId(chosen) || pastPassTy,
     label: getLabel(chosen) || pastPassTy,
     allLabels,
     rawSample: typesList[0],
+    gateOutPassVal: pastPass?.GateOutPass ?? 'true',
+    lvTyVal: pastPass?.LvTy || 'Leave',
   };
 }
 
@@ -292,9 +314,11 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
       isFrmReact: true,
     });
     const existingLeaves = findFirstArrayOfObjects(leavesRes);
-    const alreadyExists = existingLeaves.some((lv) => isLeaveForDate(lv, todayStr));
+    const alreadyExists = existingLeaves.some(
+      (lv) => isGatePassEntry(lv) && isLeaveForDate(lv, todayStr)
+    );
     if (alreadyExists && !dryRun) {
-      const existsMsg = `Pass already exists in Camu for ${todayStr} (skipped duplicate).`;
+      const existsMsg = `Gate pass already exists in Camu for ${todayStr} (skipped duplicate).`;
       await chrome.storage.local.set({
         lastSubmittedDate: todayStr,
         lastStatus: existsMsg,
@@ -306,7 +330,7 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     // 2. Fetch pass types and resolve passTy ID
     const typesRes = await camuPost('/api/gatepasses/fetch-gatepasses-types', null);
     const typesList = findFirstArrayOfObjects(typesRes);
-    const resolvedType = resolvePassType(typesList, config.passType || 'Day Outing', existingLeaves);
+    const resolvedType = resolvePassType(typesList, config.passType || 'Week End Gate Pass', existingLeaves);
 
     if (!resolvedType.id) {
       const rawPreview = JSON.stringify(typesRes).slice(0, 140);
@@ -319,10 +343,10 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     const payload = {
       Attachments: [],
       FrDt: `${todayStr}T00:00:00.000Z`,
-      GateOutPass: true,
+      GateOutPass: resolvedType.gateOutPassVal,
       HstleReq: 'true',
       InId: profile.institutionId || '',
-      LvTy: 'Leave',
+      LvTy: resolvedType.lvTyVal,
       PerId: profile.studentId,
       PerNm: profile.name || '',
       PerTy: 'Student',

@@ -88,6 +88,9 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.0.0-alpha.13`):**
+  - Filtered duplicate checks in `extension/background.js` with `isGatePassEntry()` so regular Leaves don't block Weekend Gate Pass submissions.
+  - Prioritized `passCd` (`WEEK_END_PASS`) from `/api/gatepasses/fetch-gatepasses-types`, used string `'true'` for `GateOutPass` (matching `HstleReq`), and updated default `passType` to `Week End Gate Pass`.
 - **2026-11-27 (`v1.0.0-alpha.12`):**
   - Updated `resolvePassType()` in `extension/background.js` to prioritize `passCd` (e.g. `WEEK_END_PASS`) as the `passTy` ID and `code` (e.g. `Week End Gate Pass`) as the display label from `/api/gatepasses/fetch-gatepasses-types`.
 - **2026-11-27 (`v1.0.0-alpha.11`):**
