@@ -26,16 +26,32 @@ function renderProfile(profile) {
   syncBtn.textContent = 'Re-sync';
 }
 
+function getLocalDateString(now = new Date()) {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function renderSubmittedPin(lastSubmittedDate) {
+  const pin = document.getElementById('submitted-pin');
+  const text = document.getElementById('submitted-pin-text');
+  const isSubmittedToday = lastSubmittedDate === getLocalDateString();
+  pin.className = `badge ${isSubmittedToday ? 'badge-submitted' : 'badge-pending'}`;
+  text.textContent = isSubmittedToday ? 'Submitted' : 'Not submitted';
+}
+
 function renderScriptBadge(enabled) {
   const badge = document.getElementById('script-state-badge');
   badge.textContent = enabled ? 'ON' : 'OFF';
 }
 
 async function loadSettings() {
-  const data = await chrome.storage.local.get([...FIELDS, 'lastStatus', 'fetchedProfile']);
+  const data = await chrome.storage.local.get([...FIELDS, 'lastStatus', 'fetchedProfile', 'lastSubmittedDate']);
   const isEnabled = data.enabled ?? true;
   document.getElementById('enabled').checked = isEnabled;
   renderScriptBadge(isEnabled);
+  renderSubmittedPin(data.lastSubmittedDate);
   document.getElementById('passType').value = data.passType || 'Day Outing';
   document.getElementById('reason').value = data.reason || 'Outing';
   document.getElementById('outTime').value = data.outTime || '10:00';
@@ -99,6 +115,7 @@ async function triggerRun(dryRun) {
   try {
     const res = await chrome.runtime.sendMessage({ action: 'RUN_NOW', dryRun });
     if (res?.profile) renderProfile(res.profile);
+    if (res?.submittedToday) renderSubmittedPin(getLocalDateString());
     setBanner(res?.message || 'Done.');
   } catch (err) {
     setBanner(`Error: ${err.message}`);

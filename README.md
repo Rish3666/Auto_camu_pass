@@ -15,7 +15,7 @@ Includes **three ways** to run it—choose what fits best:
 Each friend installs the extension in Chrome/Brave/Edge, saves their own credentials locally (`chrome.storage.local`), and never shares passwords with anyone.
 
 ### How Friends Install & Use It
-1. Download the latest **Alpha** `.zip` (e.g. `auto-camu-pass-extension-v1.0.0-alpha.7.zip`) from the **[Releases](../../releases)** page and unzip it.
+1. Download the latest **Alpha** `.zip` (e.g. `auto-camu-pass-extension-v1.0.0-alpha.8.zip`) from the **[Releases](../../releases)** page and unzip it.
 2. Open Chrome and go to `chrome://extensions`.
 3. Enable **Developer mode** (top-right toggle).
 4. Click **Load unpacked** and select the unzipped folder.

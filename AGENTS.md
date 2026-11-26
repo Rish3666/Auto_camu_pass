@@ -88,6 +88,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.0.0-alpha.8`):**
+  - Added **Submitted / Not submitted** status pin (`#submitted-pin`) in the popup header and a green `OK` toolbar badge (`chrome.action.setBadgeText`) in `extension/background.js` so users can immediately see whether today's gate pass has been submitted.
 - **2026-11-27 (`v1.0.0-alpha.7`):**
   - Fixed `PASSTY_NOT_FOUND` by recursively searching `/api/gatepasses/fetch-gatepasses-types` (`findFirstArrayOfObjects` + `resolvePassType`) and surfacing resolved `passTy` + available types in Dry-run.
   - Enforced duplicate gate pass guard on both scheduled and manual `Submit now` runs via `getAllleave/`.

@@ -21,6 +21,22 @@ function isAllowedWindow(now = new Date()) {
   return (day === 4 || day === 5) && hour >= 9 && hour < 23;
 }
 
+async function updateActionBadge(submittedToday) {
+  try {
+    await chrome.action.setBadgeText({ text: submittedToday ? 'OK' : '' });
+    await chrome.action.setBadgeBackgroundColor({
+      color: submittedToday ? '#16a34a' : '#52525b',
+    });
+  } catch (err) {
+    console.warn('Badge error:', err);
+  }
+}
+
+async function syncToolbarBadge() {
+  const { lastSubmittedDate } = await chrome.storage.local.get('lastSubmittedDate');
+  await updateActionBadge(lastSubmittedDate === getLocalDateString());
+}
+
 async function ensureAlarm() {
   const existing = await chrome.alarms.get(ALARM_NAME);
   if (!existing) {
@@ -202,7 +218,8 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
         lastSubmittedDate: todayStr,
         lastStatus: existsMsg,
       });
-      return { ok: true, skipped: true, message: existsMsg };
+      await updateActionBadge(true);
+      return { ok: true, skipped: true, submittedToday: true, message: existsMsg };
     }
 
     // 2. Fetch pass types and resolve passTy ID
@@ -264,8 +281,9 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
       lastStatus: okMsg,
       lastRunAt: new Date().toISOString(),
     });
+    await updateActionBadge(true);
     await showNotification('Auto Camu Pass', okMsg);
-    return { ok: true, message: okMsg };
+    return { ok: true, submittedToday: true, message: okMsg };
   } catch (err) {
     const msg = err?.message || String(err);
     const friendly = /401|403|HTML|login/i.test(msg)
@@ -291,16 +309,19 @@ chrome.runtime.onInstalled.addListener(async () => {
     await chrome.storage.local.set({ enabled: true });
   }
   await ensureAlarm();
+  await syncToolbarBadge();
   await checkScheduleAndRun();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
   await ensureAlarm();
+  await syncToolbarBadge();
   await checkScheduleAndRun();
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_NAME) {
+    await syncToolbarBadge();
     await checkScheduleAndRun();
   }
 });
