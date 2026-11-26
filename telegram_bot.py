@@ -257,14 +257,14 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("test", test_cmd))
     app.add_handler(CommandHandler("submit", submit_cmd))
 
-    # Schedule every Tuesday (day 2 in python-telegram-bot: 0=Sun, 1=Mon, 2=Tue)
+    # Schedule every Thursday & Friday (days 4, 5 in python-telegram-bot: 0=Sun..6=Sat)
     hour = int(os.environ.get("SCHEDULE_HOUR", "10"))
     minute = int(os.environ.get("SCHEDULE_MINUTE", "0"))
     app.job_queue.run_daily(
         weekly_tuesday_job,
         time=dt_time(hour=hour, minute=minute, tzinfo=IST),
-        days=(2,),
-        name="tuesday_gatepass_batch",
+        days=(4, 5),
+        name="thu_fri_gatepass_batch",
     )
     return app
 

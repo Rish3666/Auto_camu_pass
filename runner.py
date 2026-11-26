@@ -53,9 +53,9 @@ def run_batch(
     """Execute gate pass submissions sequentially for all enabled users."""
     now_ist = current_ist_date()
     if enforce_tuesday_window:
-        # Tuesday is weekday() == 1, window is 09:00 <= hour < 23
-        if now_ist.weekday() != 1 or not (9 <= now_ist.hour < 23):
-            print(f"Outside Tuesday 09:00–23:00 IST window ({now_ist.isoformat()}). Exiting.")
+        # Thursday = 3, Friday = 4 in Python weekday(); window is 09:00 <= hour < 23
+        if now_ist.weekday() not in (3, 4) or not (9 <= now_ist.hour < 23):
+            print(f"Outside Thu–Fri 09:00–23:00 IST window ({now_ist.isoformat()}). Exiting.")
             return []
 
     users = load_users()

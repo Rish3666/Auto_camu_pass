@@ -55,8 +55,8 @@ async function toggleScript(event) {
   setBanner(
     res?.message ||
       (enabled
-        ? 'Script ON: checks on browser launch & every 15m on Tuesdays.'
-        : 'Script OFF: Tuesday auto-submit paused.')
+        ? 'Script ON: checks on browser launch & every 15m on Thu & Fri.'
+        : 'Script OFF: Thu & Fri auto-submit paused.')
   );
 }
 

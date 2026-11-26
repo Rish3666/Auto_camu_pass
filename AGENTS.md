@@ -5,7 +5,7 @@
 ---
 
 ## 1. Project Overview
-**Goal:** Automate weekly Gate Pass submissions on `https://student.camu.in/v2/profile` every **Tuesday between 09:00 and 23:00 (local/IST)** so students don't have to submit manually.
+**Goal:** Automate weekly Gate Pass submissions on `https://student.camu.in/v2/profile` every **Thursday and Friday between 09:00 and 23:00 (local/IST)** so students don't have to submit manually.
 
 The repository supports **three independent delivery modes** sharing the same core goal:
 1. **Chrome Extension (`extension/`)** — *Primary self-service mode for friends.* Runs locally in each user's browser via Manifest V3 (`chrome.alarms` + `chrome.storage.local`). Zero server cost, zero shared passwords.
@@ -88,6 +88,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.0.0-alpha.6`):**
+  - Switched schedule from Tuesday to **Thursday & Friday (09:00–23:00)** across `extension/background.js` (`day === 4 || day === 5`), `extension/popup/*`, `runner.py`, `.github/workflows/weekly_batch.yml` (`30 4 * * 4,5`), and `telegram_bot.py` (`days=(4, 5)`).
 - **2026-11-27 (`v1.0.0-alpha.5`):**
   - Added instant **Script ON / OFF** toggle (`TOGGLE_SCRIPT`) in `extension/popup/*` and `extension/background.js` that immediately persists state, ensures the 15-minute `chrome.alarms` schedule, and checks on browser launch (`onStartup`) + every 15m on Tuesdays (09:00–23:00).
 - **2026-11-27 (`v1.0.0-alpha.4`):**

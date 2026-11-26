@@ -2,8 +2,8 @@ name: Weekly Camu Gate Pass Batch
 
 on:
   schedule:
-    # Runs every Tuesday at 04:30 UTC (10:00 AM IST — inside 09:00–23:00 IST window)
-    - cron: '30 4 * * 2'
+    # Runs every Thursday & Friday at 04:30 UTC (10:00 AM IST — inside 09:00–23:00 IST window)
+    - cron: '30 4 * * 4,5'
   workflow_dispatch:
     inputs:
       dry_run:

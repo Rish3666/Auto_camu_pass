@@ -3,7 +3,7 @@
  * Uses silent fetch() against Camu's REST APIs (no tabs opened).
  */
 
-const ALARM_NAME = 'camu-tuesday-check';
+const ALARM_NAME = 'camu-schedule-check';
 const CAMU_BASE = 'https://student.camu.in';
 const CAMU_PROFILE_URL = `${CAMU_BASE}/v2/profile`;
 
@@ -14,10 +14,11 @@ function getLocalDateString(now = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-function isTuesdayWindow(now = new Date()) {
-  const isTuesday = now.getDay() === 2;
+function isAllowedWindow(now = new Date()) {
+  // JS getDay(): 4 = Thursday, 5 = Friday
+  const day = now.getDay();
   const hour = now.getHours();
-  return isTuesday && hour >= 9 && hour < 23;
+  return (day === 4 || day === 5) && hour >= 9 && hour < 23;
 }
 
 async function ensureAlarm() {
@@ -255,7 +256,7 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
 }
 
 async function checkScheduleAndRun() {
-  if (!isTuesdayWindow()) return;
+  if (!isAllowedWindow()) return;
   await runGatePassSubmission({ dryRun: false, manual: false });
 }
 
@@ -301,10 +302,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         await checkScheduleAndRun();
         sendResponse({
           ok: true,
-          message: 'Script ON: checks on browser launch & every 15m on Tuesdays.',
+          message: 'Script ON: checks on browser launch & every 15m on Thu & Fri.',
         });
       } else {
-        sendResponse({ ok: true, message: 'Script OFF: Tuesday auto-submit paused.' });
+        sendResponse({ ok: true, message: 'Script OFF: Thu & Fri auto-submit paused.' });
       }
       return;
     }

@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Auto Camu Pass",
-  "version": "1.0.4",
-  "version_name": "1.0.0-alpha.5",
-  "description": "Automatically submits your Camu gate pass every Tuesday between 09:00 and 23:00.",
+  "version": "1.0.5",
+  "version_name": "1.0.0-alpha.6",
+  "description": "Automatically submits your Camu gate pass every Thursday and Friday between 09:00 and 23:00.",
   "permissions": [
     "alarms",
     "storage",
