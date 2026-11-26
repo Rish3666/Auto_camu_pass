@@ -33,13 +33,14 @@ async function updateActionBadge(submittedToday) {
 }
 
 function isGatePassEntry(leaveObj) {
+  if (!leaveObj) return false;
+  if (leaveObj.GateOutPass === false || leaveObj.GateOutPass === 'false') return false;
   return Boolean(
-    leaveObj &&
-      (leaveObj.GateOutPass === true ||
-        leaveObj.GateOutPass === 'true' ||
-        leaveObj.passTy ||
-        leaveObj.PassTy ||
-        leaveObj.passCd)
+    leaveObj.GateOutPass === true ||
+      leaveObj.GateOutPass === 'true' ||
+      leaveObj.passTy ||
+      leaveObj.PassTy ||
+      leaveObj.passCd
   );
 }
 
@@ -258,12 +259,18 @@ function resolvePassType(typesList, desiredLabel, existingLeaves = []) {
     ).trim();
 
   const allLabels = typesList.map((t) => `${getLabel(t) || '?'}:${getId(t)}`).filter(Boolean);
-  const target = (desiredLabel || '').trim().toLowerCase();
-  const match = typesList.find((item) => {
-    const lbl = getLabel(item).toLowerCase();
-    const id = getId(item).toLowerCase();
-    return target && ((lbl && (lbl === target || lbl.includes(target) || target.includes(lbl))) || id === target);
-  });
+  const target = (desiredLabel || 'Week End Gate Pass').trim().toLowerCase();
+  const weekendMatch = typesList.find(
+    (item) =>
+      String(item.passCd || '').toUpperCase() === 'WEEK_END_PASS' ||
+      getLabel(item).toLowerCase().includes('week end')
+  );
+  const match =
+    typesList.find((item) => {
+      const lbl = getLabel(item).toLowerCase();
+      const id = getId(item).toLowerCase();
+      return target && ((lbl && (lbl === target || lbl.includes(target) || target.includes(lbl))) || id === target);
+    }) || weekendMatch;
   const chosen = match || typesList[0];
   return {
     id: getId(chosen) || pastPassTy,

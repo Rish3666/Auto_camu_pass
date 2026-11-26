@@ -88,6 +88,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.0.0-alpha.14`):**
+  - Locked pass resolution to prefer `WEEK_END_PASS` (`Week End Gate Pass`) over normal Leave passes and migrated any older stored `Day Outing` value in `extension/popup/popup.js`.
 - **2026-11-27 (`v1.0.0-alpha.13`):**
   - Filtered duplicate checks in `extension/background.js` with `isGatePassEntry()` so regular Leaves don't block Weekend Gate Pass submissions.
   - Prioritized `passCd` (`WEEK_END_PASS`) from `/api/gatepasses/fetch-gatepasses-types`, used string `'true'` for `GateOutPass` (matching `HstleReq`), and updated default `passType` to `Week End Gate Pass`.

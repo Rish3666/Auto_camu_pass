@@ -52,7 +52,9 @@ async function loadSettings() {
   document.getElementById('enabled').checked = isEnabled;
   renderScriptBadge(isEnabled);
   renderSubmittedPin(data.lastSubmittedDate);
-  document.getElementById('passType').value = data.passType || 'Week End Gate Pass';
+  const savedPassType =
+    !data.passType || data.passType === 'Day Outing' ? 'Week End Gate Pass' : data.passType;
+  document.getElementById('passType').value = savedPassType;
   document.getElementById('reason').value = data.reason || 'Outing';
   document.getElementById('outTime').value = data.outTime || '10:00';
   document.getElementById('inTime').value = data.inTime || '20:00';
