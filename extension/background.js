@@ -207,6 +207,8 @@ function resolvePassType(typesList, desiredLabel, existingLeaves = []) {
       item.Nm ||
         item.Name ||
         item.name ||
+        item.code ||
+        item.Code ||
         item.PassNm ||
         item.passNm ||
         item.Desc ||
@@ -214,8 +216,6 @@ function resolvePassType(typesList, desiredLabel, existingLeaves = []) {
         item.label ||
         item.Title ||
         item.title ||
-        item.Code ||
-        item.code ||
         item.PassTy ||
         item.passTy ||
         item.type ||
@@ -224,13 +224,15 @@ function resolvePassType(typesList, desiredLabel, existingLeaves = []) {
 
   const getId = (item) =>
     String(
-      item.passTy ||
+      item.passCd ||
+        item.PassCd ||
+        item.passTy ||
         item.PassTy ||
-        item.Code ||
-        item.code ||
         item.Cd ||
         item._id ||
         item.id ||
+        item.code ||
+        item.Code ||
         item.value ||
         getLabel(item) ||
         ''
