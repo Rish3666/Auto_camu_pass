@@ -43,9 +43,37 @@ async function updateActionBadge(submittedToday) {
   }
 }
 
+function isCancelledOrRejected(leaveObj) {
+  if (!leaveObj || typeof leaveObj !== 'object') return false;
+  if (leaveObj.isCncl === true || leaveObj.isCancelled === true || leaveObj.isDeleted === true) {
+    return true;
+  }
+  const stFl = String(leaveObj.StFl || leaveObj.stFl || '').trim().toUpperCase();
+  if (stFl && stFl !== 'A') {
+    return true;
+  }
+  const statusFields = [
+    leaveObj.Status,
+    leaveObj.status,
+    leaveObj.LvSt,
+    leaveObj.ApprSt,
+    leaveObj.apprSt,
+    leaveObj.GatePassSt,
+    leaveObj.state,
+  ];
+  for (const val of statusFields) {
+    if (!val) continue;
+    if (/cancel|reject|declin|delet|withdraw/i.test(String(val))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function isGatePassEntry(leaveObj) {
   if (!leaveObj) return false;
   if (leaveObj.GateOutPass === false || leaveObj.GateOutPass === 'false') return false;
+  if (isCancelledOrRejected(leaveObj)) return false;
   return Boolean(
     leaveObj.GateOutPass === true ||
       leaveObj.GateOutPass === 'true' ||
@@ -74,13 +102,10 @@ async function checkCamuSubmittedToday() {
     'fetchedProfile',
     'lastSubmittedDate',
   ]);
-  if (lastSubmittedDate === fridayDateStr) {
-    await updateActionBadge(true);
-    return { submittedToday: true, weekendDate: fridayDateStr, source: 'local' };
-  }
   if (!fetchedProfile?.studentId) {
-    await updateActionBadge(false);
-    return { submittedToday: false, weekendDate: fridayDateStr, source: 'no_profile' };
+    const localMatch = lastSubmittedDate === fridayDateStr;
+    await updateActionBadge(localMatch);
+    return { submittedToday: localMatch, weekendDate: fridayDateStr, source: 'no_profile' };
   }
 
   try {
@@ -100,11 +125,20 @@ async function checkCamuSubmittedToday() {
       await updateActionBadge(true);
       return { submittedToday: true, weekendDate: fridayDateStr, source: 'camu_api' };
     }
+
+    // Clear stale local submitted flag if pass was cancelled on Camu
+    if (lastSubmittedDate === fridayDateStr) {
+      await chrome.storage.local.set({
+        lastSubmittedDate: '',
+        lastStatus: 'Not submitted (cancelled or not found in Camu)',
+      });
+    }
     await updateActionBadge(false);
     return { submittedToday: false, weekendDate: fridayDateStr, source: 'camu_api' };
   } catch (_) {
-    await updateActionBadge(false);
-    return { submittedToday: false, weekendDate: fridayDateStr, source: 'error' };
+    const localMatch = lastSubmittedDate === fridayDateStr;
+    await updateActionBadge(localMatch);
+    return { submittedToday: localMatch, weekendDate: fridayDateStr, source: 'error' };
   }
 }
 

@@ -71,7 +71,7 @@ async function loadSettings() {
   }
   renderProfile(data.fetchedProfile);
 
-  // Also check Camu silently so manual submissions show as Submitted
+  // Also check Camu silently so manual submissions & cancellations stay in sync
   try {
     const live = await chrome.runtime.sendMessage({ action: 'CHECK_TODAY_STATUS' });
     if (live?.submittedToday) {
@@ -79,6 +79,8 @@ async function loadSettings() {
       if (live.source === 'camu_api') {
         setBanner(`Submitted in Camu (Fri ${live.weekendDate || getWeekendFridayString()})`);
       }
+    } else if (live && !live.submittedToday && live.source === 'camu_api') {
+      renderSubmittedPin('');
     }
   } catch (_) {}
 }

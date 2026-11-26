@@ -93,6 +93,9 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v0.1.1` — Beta 2):**
+  - Added `isCancelledOrRejected()` in `extension/background.js` so cancelled/rejected/inactive (`StFl !== 'A'`, `isCncl`, `Cancel`/`Reject`) passes in `getAllleave/` are ignored by duplicate checks.
+  - Updated `checkCamuSubmittedToday()` and `extension/popup/popup.js` to always verify live against Camu and clear stale `lastSubmittedDate` when a user cancels their pass.
 - **2026-11-27 (`v0.1.0` — Beta 1):**
   - Promoted the extension from Alpha (`v0.0.x`) to **Beta 1 (`v0.1.0`)**.
   - Updated versioning scheme (`0.0.x` = Alpha, `0.1.x` = Beta, `1.0.0+` = Stable) in `AGENTS.md`, `manifest.json`, and `.github/workflows/release_extension.yml`.
