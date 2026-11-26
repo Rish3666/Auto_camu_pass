@@ -6,7 +6,7 @@ import logging
 import os
 import random
 import re
-from datetime import time as dt_time
+from datetime import time as dt_time, timedelta
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -52,6 +52,16 @@ _TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
 def _esc(value: object) -> str:
     return html.escape(str(value or ""))
+
+
+def get_weekend_dates(now=None) -> tuple[str, str]:
+    """Return (friday_date_str, sunday_date_str) for the upcoming/current weekend in IST."""
+    ref = now or current_ist_date()
+    # Python weekday(): Mon=0 .. Thu=3, Fri=4, Sat=5, Sun=6
+    days_until_friday = 0 if ref.weekday() == 4 else (4 - ref.weekday() + 7) % 7
+    friday = ref + timedelta(days=days_until_friday)
+    sunday = friday + timedelta(days=2)
+    return friday.strftime("%Y-%m-%d"), sunday.strftime("%Y-%m-%d")
 
 
 def validate_time_pair(out_str: str, in_str: str) -> tuple[bool, str]:
@@ -354,11 +364,11 @@ async def _handle_manual_run(update: Update, *, dry_run: bool) -> None:
         )
 
         result = await asyncio.to_thread(_run_single_user_sync, user, dry_run=dry_run)
-        today_str = current_ist_date().strftime("%Y-%m-%d")
+        friday_str, _ = get_weekend_dates()
         record_submission_status(
             uid,
             status=f"{result.status}: {result.message}",
-            submitted_date=today_str if (not dry_run and result.status == "submitted") else None,
+            submitted_date=friday_str if (not dry_run and result.status == "submitted") else None,
             db_path=DB_PATH,
         )
 
@@ -386,13 +396,13 @@ async def submit_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def weekly_tuesday_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Scheduled Thursday/Friday job: processes all active users with dedup and staggered delays."""
-    today_str = current_ist_date().strftime("%Y-%m-%d")
+    """Scheduled Thursday/Friday job: deduplicates per weekend (Friday date) with staggered delays."""
+    friday_str, sunday_str = get_weekend_dates()
     users = list_active_users(db_path=DB_PATH)
     for idx, user in enumerate(users):
         uid = user["telegram_user_id"]
-        if user.get("last_submitted_date") == today_str:
-            logger.info("Skipping %s: already submitted on %s", user["name"], today_str)
+        if user.get("last_submitted_date") == friday_str:
+            logger.info("Skipping %s: already submitted for weekend %s -> %s", user["name"], friday_str, sunday_str)
             continue
         if uid in _IN_FLIGHT_USERS:
             logger.info("Skipping %s: manual run already in flight", user["name"])
@@ -405,7 +415,7 @@ async def weekly_tuesday_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             record_submission_status(
                 uid,
                 status=f"{result.status}: {result.message}",
-                submitted_date=today_str if result.status == "submitted" else None,
+                submitted_date=friday_str if result.status == "submitted" else None,
                 db_path=DB_PATH,
             )
             emoji = "✅" if result.status == "submitted" else "❌"

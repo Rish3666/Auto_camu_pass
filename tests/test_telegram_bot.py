@@ -138,10 +138,10 @@ async def test_weekly_job_dedups_and_inline_pause_callback(tmp_path, monkeypatch
     monkeypatch.setattr(telegram_bot, "DB_PATH", db_file)
     monkeypatch.setenv("CAMU_SECRET_KEY", key)
 
-    today = telegram_bot.current_ist_date().strftime("%Y-%m-%d")
+    friday_str, _ = telegram_bot.get_weekend_dates()
 
     upsert_user(telegram_user_id=1, chat_id=1, name="AlreadyDone", camu_username="a@c.edu", camu_password="1", db_path=db_file, secret_key=key)
-    record_submission_status(1, status="submitted: ok", submitted_date=today, db_path=db_file)
+    record_submission_status(1, status="submitted: ok", submitted_date=friday_str, db_path=db_file)
 
     upsert_user(telegram_user_id=2, chat_id=2, name="WillSucceed", camu_username="b@c.edu", camu_password="2", db_path=db_file, secret_key=key)
 
@@ -161,7 +161,7 @@ async def test_weekly_job_dedups_and_inline_pause_callback(tmp_path, monkeypatch
 
     updated = get_user(2, db_path=db_file)
     assert updated is not None
-    assert updated["last_submitted_date"] == today
+    assert updated["last_submitted_date"] == friday_str
 
     cb_query = SimpleNamespace(data="action:pause", answer=AsyncMock(), edit_message_text=AsyncMock())
     cb_upd = SimpleNamespace(effective_user=SimpleNamespace(id=2), callback_query=cb_query)
