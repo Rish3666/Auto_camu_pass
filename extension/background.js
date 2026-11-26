@@ -52,18 +52,9 @@ function isCancelledOrRejected(leaveObj) {
   if (stFl && stFl !== 'A') {
     return true;
   }
-  const statusFields = [
-    leaveObj.Status,
-    leaveObj.status,
-    leaveObj.LvSt,
-    leaveObj.ApprSt,
-    leaveObj.apprSt,
-    leaveObj.GatePassSt,
-    leaveObj.state,
-  ];
-  for (const val of statusFields) {
-    if (!val) continue;
-    if (/cancel|reject|declin|delet|withdraw/i.test(String(val))) {
+  for (const [key, val] of Object.entries(leaveObj)) {
+    if (/^(rson|reason|pernm|name|email|id|_id)$/i.test(key)) continue;
+    if (typeof val === 'string' && /cancel|reject|declin|delet|withdraw|expir/i.test(val)) {
       return true;
     }
   }

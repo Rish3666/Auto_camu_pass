@@ -93,6 +93,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v0.1.2` — Beta 1.2):**
+  - Broadened `isCancelledOrRejected()` in `extension/background.js` to scan all non-reason string properties on Camu leave objects for `cancel|reject|declin|delet|withdraw|expir` so any Camu status field name is detected.
 - **2026-11-27 (`v0.1.1` — Beta 1.1):**
   - Added `isCancelledOrRejected()` in `extension/background.js` so cancelled/rejected/inactive (`StFl !== 'A'`, `isCncl`, `Cancel`/`Reject`) passes in `getAllleave/` are ignored by duplicate checks.
   - Updated `checkCamuSubmittedToday()` and `extension/popup/popup.js` to always verify live against Camu and clear stale `lastSubmittedDate` when a user cancels their pass.
