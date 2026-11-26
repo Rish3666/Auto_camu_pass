@@ -88,6 +88,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.0.0-alpha.11`):**
+  - Updated `resolvePassType()` in `extension/background.js` to check past `GateOutPass` entries in `getAllleave/` for a known working `passTy`, prioritize `passTy`/`Code` fields over `_id` in `fetch-gatepasses-types`, and print the raw sample in Dry-run.
 - **2026-11-27 (`v1.0.0-alpha.10`):**
   - Fixed flex text overflow in the popup profile card (`extension/popup/popup.html`, `extension/popup/popup.css`) by adding `flex: 1; min-width: 0; overflow: hidden;` on `.profile-info` and `.profile-text` so long names/emails truncate cleanly with ellipsis instead of overlapping the `Re-sync` button.
 - **2026-11-27 (`v1.0.0-alpha.9`):**

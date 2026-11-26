@@ -193,20 +193,50 @@ function findFirstArrayOfObjects(root, depth = 0) {
   return [];
 }
 
-function resolvePassType(typesList, desiredLabel) {
-  if (!typesList.length) return { id: '', label: '', allLabels: [] };
+function resolvePassType(typesList, desiredLabel, existingLeaves = []) {
+  // 1. Check past gate passes in getAllleave/ for a known working passTy
+  const pastPass = existingLeaves.find((lv) => lv && (lv.passTy || lv.PassTy) && lv.GateOutPass);
+  const pastPassTy = pastPass ? String(pastPass.passTy || pastPass.PassTy).trim() : '';
+
+  if (!typesList.length) {
+    return { id: pastPassTy, label: pastPassTy, allLabels: [], rawSample: null };
+  }
 
   const getLabel = (item) =>
     String(
-      item.Nm || item.name || item.PassNm || item.passNm || item.label || item.title || item.PassTy || item.passTy || item.type || ''
+      item.Nm ||
+        item.Name ||
+        item.name ||
+        item.PassNm ||
+        item.passNm ||
+        item.Desc ||
+        item.description ||
+        item.label ||
+        item.Title ||
+        item.title ||
+        item.Code ||
+        item.code ||
+        item.PassTy ||
+        item.passTy ||
+        item.type ||
+        ''
     ).trim();
 
   const getId = (item) =>
     String(
-      item._id || item.id || item.passTy || item.PassTy || item.code || item.Cd || item.value || getLabel(item) || ''
+      item.passTy ||
+        item.PassTy ||
+        item.Code ||
+        item.code ||
+        item.Cd ||
+        item._id ||
+        item.id ||
+        item.value ||
+        getLabel(item) ||
+        ''
     ).trim();
 
-  const allLabels = typesList.map(getLabel).filter(Boolean);
+  const allLabels = typesList.map((t) => `${getLabel(t) || '?'}:${getId(t)}`).filter(Boolean);
   const target = (desiredLabel || '').trim().toLowerCase();
   const match = typesList.find((item) => {
     const lbl = getLabel(item).toLowerCase();
@@ -214,9 +244,10 @@ function resolvePassType(typesList, desiredLabel) {
   });
   const chosen = match || typesList[0];
   return {
-    id: getId(chosen),
-    label: getLabel(chosen),
+    id: pastPassTy || getId(chosen),
+    label: getLabel(chosen) || pastPassTy,
     allLabels,
+    rawSample: typesList[0],
   };
 }
 
@@ -273,7 +304,7 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     // 2. Fetch pass types and resolve passTy ID
     const typesRes = await camuPost('/api/gatepasses/fetch-gatepasses-types', null);
     const typesList = findFirstArrayOfObjects(typesRes);
-    const resolvedType = resolvePassType(typesList, config.passType || 'Day Outing');
+    const resolvedType = resolvePassType(typesList, config.passType || 'Day Outing', existingLeaves);
 
     if (!resolvedType.id) {
       const rawPreview = JSON.stringify(typesRes).slice(0, 140);
@@ -308,11 +339,8 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     };
 
     if (dryRun) {
-      const typesNote = resolvedType.allLabels.length
-        ? `types=[${resolvedType.allLabels.join(', ')}]`
-        : `passTy="${resolvedType.id}"`;
-      const dupNote = alreadyExists ? ' (note: pass already exists today)' : '';
-      const msg = `Dry-run OK: using "${resolvedType.label || resolvedType.id}" (${typesNote})${dupNote}.`;
+      const sampleStr = resolvedType.rawSample ? JSON.stringify(resolvedType.rawSample) : 'none';
+      const msg = `Dry-run OK: passTy="${resolvedType.id}" | types=[${resolvedType.allLabels.join(', ')}] | sample=${sampleStr}`;
       await chrome.storage.local.set({
         lastStatus: msg,
         lastRunAt: new Date().toISOString(),
