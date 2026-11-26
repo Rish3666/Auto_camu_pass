@@ -88,6 +88,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.0.0-alpha.5`):**
+  - Added instant **Script ON / OFF** toggle (`TOGGLE_SCRIPT`) in `extension/popup/*` and `extension/background.js` that immediately persists state, ensures the 15-minute `chrome.alarms` schedule, and checks on browser launch (`onStartup`) + every 15m on Tuesdays (09:00–23:00).
 - **2026-11-27 (`v1.0.0-alpha.4`):**
   - Switched Chrome Extension (`extension/background.js`) to **100% silent `fetch()` mode** using the captured Camu endpoints (`POST /api/Leave/getAllleave/`, `POST /api/gatepasses/fetch-gatepasses-types`, `POST /api/Leave/crtLv`)—no tabs opened on Dry-Run or Tuesday auto-submit.
   - Updated `extension/content.js` to extract `StuID`/`PerId`, `InId`, `loggedInId`, and `PerNm` from the logged-in Camu session.

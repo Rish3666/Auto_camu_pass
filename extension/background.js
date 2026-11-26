@@ -260,6 +260,10 @@ async function checkScheduleAndRun() {
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
+  const { enabled } = await chrome.storage.local.get('enabled');
+  if (enabled === undefined) {
+    await chrome.storage.local.set({ enabled: true });
+  }
   await ensureAlarm();
   await checkScheduleAndRun();
 });
@@ -286,6 +290,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.action === 'OPEN_CAMU_AND_SYNC') {
       const result = await openOrFocusCamuAndSync();
       sendResponse(result);
+      return;
+    }
+
+    if (message.action === 'TOGGLE_SCRIPT') {
+      const enabled = Boolean(message.enabled);
+      await chrome.storage.local.set({ enabled });
+      if (enabled) {
+        await ensureAlarm();
+        await checkScheduleAndRun();
+        sendResponse({
+          ok: true,
+          message: 'Script ON: checks on browser launch & every 15m on Tuesdays.',
+        });
+      } else {
+        sendResponse({ ok: true, message: 'Script OFF: Tuesday auto-submit paused.' });
+      }
       return;
     }
 

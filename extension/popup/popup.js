@@ -26,9 +26,16 @@ function renderProfile(profile) {
   syncBtn.textContent = 'Re-sync';
 }
 
+function renderScriptBadge(enabled) {
+  const badge = document.getElementById('script-state-badge');
+  badge.textContent = enabled ? 'ON' : 'OFF';
+}
+
 async function loadSettings() {
   const data = await chrome.storage.local.get([...FIELDS, 'lastStatus', 'fetchedProfile']);
-  document.getElementById('enabled').checked = data.enabled ?? true;
+  const isEnabled = data.enabled ?? true;
+  document.getElementById('enabled').checked = isEnabled;
+  renderScriptBadge(isEnabled);
   document.getElementById('passType').value = data.passType || 'Day Outing';
   document.getElementById('reason').value = data.reason || 'Outing';
   document.getElementById('outTime').value = data.outTime || '10:00';
@@ -38,6 +45,19 @@ async function loadSettings() {
     setBanner(data.lastStatus);
   }
   renderProfile(data.fetchedProfile);
+}
+
+async function toggleScript(event) {
+  const enabled = event.target.checked;
+  renderScriptBadge(enabled);
+  await chrome.storage.local.set({ enabled });
+  const res = await chrome.runtime.sendMessage({ action: 'TOGGLE_SCRIPT', enabled });
+  setBanner(
+    res?.message ||
+      (enabled
+        ? 'Script ON: checks on browser launch & every 15m on Tuesdays.'
+        : 'Script OFF: Tuesday auto-submit paused.')
+  );
 }
 
 async function saveSettings(event) {
@@ -90,6 +110,7 @@ async function triggerRun(dryRun) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadSettings();
+  document.getElementById('enabled').addEventListener('change', toggleScript);
   document.getElementById('settings-form').addEventListener('submit', saveSettings);
   document.getElementById('sync-btn').addEventListener('click', openCamuAndSync);
   document.getElementById('dry-run-btn').addEventListener('click', () => triggerRun(true));
