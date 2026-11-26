@@ -1,0 +1,24 @@
+[
+  {
+    "name": "Friend 1",
+    "username": "student1@college.edu",
+    "password": "replace-with-password",
+    "enabled": true,
+    "pass_type": "Day Outing",
+    "reason": "Personal work",
+    "out_time": "10:00",
+    "in_time": "20:00",
+    "telegram_chat_id": ""
+  },
+  {
+    "name": "Friend 2",
+    "username": "student2@college.edu",
+    "password": "replace-with-password",
+    "enabled": false,
+    "pass_type": "Day Outing",
+    "reason": "Medical appointment",
+    "out_time": "14:00",
+    "in_time": "19:00",
+    "telegram_chat_id": ""
+  }
+]

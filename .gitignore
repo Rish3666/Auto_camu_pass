@@ -1,0 +1,15 @@
+# Plaintext credentials & secrets (NEVER commit these!)
+users.json
+.env
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Artifacts & debug screenshots
+screenshots/
+*.png
