@@ -93,6 +93,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v0.1.3` — Beta 1.3):**
+  - Added collapsible **Developer mode** (`Copy Camu leaves JSON`) in `extension/popup/*` and `GET_DEBUG_LOGS` in `extension/background.js` so users can copy the exact `getAllleave/` JSON for debugging without extra permissions.
 - **2026-11-27 (`v0.1.2` — Beta 1.2):**
   - Broadened `isCancelledOrRejected()` in `extension/background.js` to scan all non-reason string properties on Camu leave objects for `cancel|reject|declin|delet|withdraw|expir` so any Camu status field name is detected.
 - **2026-11-27 (`v0.1.1` — Beta 1.1):**

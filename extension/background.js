@@ -485,6 +485,32 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return;
     }
 
+    if (message.action === 'GET_DEBUG_LOGS') {
+      const { fridayDateStr, sundayDateStr } = getWeekendDates();
+      const { fetchedProfile } = await chrome.storage.local.get('fetchedProfile');
+      if (!fetchedProfile?.studentId) {
+        sendResponse({ ok: false, message: 'Sync Camu profile first.' });
+        return;
+      }
+      try {
+        const leavesRes = await camuPost('/api/Leave/getAllleave/', {
+          StuID: fetchedProfile.studentId,
+          isFrmReact: true,
+        });
+        const allLeaves = findFirstArrayOfObjects(leavesRes);
+        sendResponse({
+          ok: true,
+          debug: {
+            targetWeekend: { fridayDateStr, sundayDateStr },
+            recentLeaves: allLeaves.slice(0, 6),
+          },
+        });
+      } catch (err) {
+        sendResponse({ ok: false, message: err?.message || String(err) });
+      }
+      return;
+    }
+
     if (message.action === 'OPEN_CAMU_AND_SYNC') {
       const result = await openOrFocusCamuAndSync();
       sendResponse(result);

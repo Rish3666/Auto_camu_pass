@@ -147,6 +147,25 @@ async function triggerRun(dryRun) {
   }
 }
 
+async function copyDebugLogs() {
+  const btn = document.getElementById('copy-debug-btn');
+  btn.disabled = true;
+  setBanner('Fetching Camu debug JSON...');
+  try {
+    const res = await chrome.runtime.sendMessage({ action: 'GET_DEBUG_LOGS' });
+    if (!res?.ok) {
+      setBanner(res?.message || 'Failed to fetch debug JSON.');
+      return;
+    }
+    await navigator.clipboard.writeText(JSON.stringify(res.debug, null, 2));
+    setBanner('Copied Camu leaves JSON to clipboard.');
+  } catch (err) {
+    setBanner(`Error: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   await loadSettings();
   document.getElementById('enabled').addEventListener('change', toggleScript);
@@ -154,4 +173,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('sync-btn').addEventListener('click', openCamuAndSync);
   document.getElementById('dry-run-btn').addEventListener('click', () => triggerRun(true));
   document.getElementById('submit-now-btn').addEventListener('click', () => triggerRun(false));
+  document.getElementById('copy-debug-btn').addEventListener('click', copyDebugLogs);
 });
