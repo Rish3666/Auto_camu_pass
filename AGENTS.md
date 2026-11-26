@@ -88,6 +88,9 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.0.0-alpha.7`):**
+  - Fixed `PASSTY_NOT_FOUND` by recursively searching `/api/gatepasses/fetch-gatepasses-types` (`findFirstArrayOfObjects` + `resolvePassType`) and surfacing resolved `passTy` + available types in Dry-run.
+  - Enforced duplicate gate pass guard on both scheduled and manual `Submit now` runs via `getAllleave/`.
 - **2026-11-27 (`v1.0.0-alpha.6`):**
   - Switched schedule from Tuesday to **Thursday & Friday (09:00–23:00)** across `extension/background.js` (`day === 4 || day === 5`), `extension/popup/*`, `runner.py`, `.github/workflows/weekly_batch.yml` (`30 4 * * 4,5`), and `telegram_bot.py` (`days=(4, 5)`).
 - **2026-11-27 (`v1.0.0-alpha.5`):**

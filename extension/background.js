@@ -115,28 +115,43 @@ async function camuPost(path, body) {
   return json ?? text;
 }
 
-function extractTypesList(apiResponse) {
-  const candidates = [
-    apiResponse?.output?.data,
-    apiResponse?.data,
-    apiResponse?.output,
-    apiResponse,
-  ];
-  for (const c of candidates) {
-    if (Array.isArray(c) && c.length > 0) return c;
+function findFirstArrayOfObjects(root, depth = 0) {
+  if (!root || typeof root !== 'object' || depth > 5) return [];
+  if (Array.isArray(root)) {
+    return root.length > 0 && typeof root[0] === 'object' ? root : [];
+  }
+  for (const val of Object.values(root)) {
+    const found = findFirstArrayOfObjects(val, depth + 1);
+    if (found.length > 0) return found;
   }
   return [];
 }
 
-function resolvePassTypeId(typesList, desiredLabel) {
-  if (!typesList.length) return desiredLabel || 'Outing';
+function resolvePassType(typesList, desiredLabel) {
+  if (!typesList.length) return { id: '', label: '', allLabels: [] };
+
+  const getLabel = (item) =>
+    String(
+      item.Nm || item.name || item.PassNm || item.passNm || item.label || item.title || item.PassTy || item.passTy || item.type || ''
+    ).trim();
+
+  const getId = (item) =>
+    String(
+      item._id || item.id || item.passTy || item.PassTy || item.code || item.Cd || item.value || getLabel(item) || ''
+    ).trim();
+
+  const allLabels = typesList.map(getLabel).filter(Boolean);
   const target = (desiredLabel || '').trim().toLowerCase();
   const match = typesList.find((item) => {
-    const label = String(item.Nm || item.name || item.PassTy || item.type || item.label || '').toLowerCase();
-    return target && (label === target || label.includes(target));
+    const lbl = getLabel(item).toLowerCase();
+    return target && lbl && (lbl === target || lbl.includes(target) || target.includes(lbl));
   });
   const chosen = match || typesList[0];
-  return chosen._id || chosen.id || chosen.code || chosen.Nm || desiredLabel;
+  return {
+    id: getId(chosen),
+    label: getLabel(chosen),
+    allLabels,
+  };
 }
 
 function buildUtcIso(dateStr, timeStr) {
@@ -177,22 +192,28 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
       StuID: profile.studentId,
       isFrmReact: true,
     });
-    const existingLeaves = extractTypesList(leavesRes);
+    const existingLeaves = findFirstArrayOfObjects(leavesRes);
     const alreadyExists = existingLeaves.some((lv) =>
       String(lv.FrDt || lv.frdt || '').startsWith(todayStr)
     );
-    if (alreadyExists && !dryRun && !manual) {
+    if (alreadyExists && !dryRun) {
+      const existsMsg = `Pass already exists in Camu for ${todayStr} (skipped duplicate).`;
       await chrome.storage.local.set({
         lastSubmittedDate: todayStr,
-        lastStatus: `Already exists in Camu (${todayStr})`,
+        lastStatus: existsMsg,
       });
-      return { ok: true, skipped: true, message: `Pass already exists in Camu for ${todayStr}.` };
+      return { ok: true, skipped: true, message: existsMsg };
     }
 
     // 2. Fetch pass types and resolve passTy ID
     const typesRes = await camuPost('/api/gatepasses/fetch-gatepasses-types', null);
-    const typesList = extractTypesList(typesRes);
-    const passTyId = resolvePassTypeId(typesList, config.passType || 'Day Outing');
+    const typesList = findFirstArrayOfObjects(typesRes);
+    const resolvedType = resolvePassType(typesList, config.passType || 'Day Outing');
+
+    if (!resolvedType.id) {
+      const rawPreview = JSON.stringify(typesRes).slice(0, 140);
+      throw new Error(`PASSTY_NOT_FOUND in fetch-gatepasses-types: ${rawPreview}`);
+    }
 
     const outTime = config.outTime || '10:00';
     const inTime = config.inTime || '20:00';
@@ -214,7 +235,7 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
       atcmnt: [],
       frdt: buildUtcIso(todayStr, outTime),
       loggedInId: profile.loggedInId || profile.studentId,
-      passTy: passTyId,
+      passTy: resolvedType.id,
       periods: [],
       rson: config.reason || 'Outing',
       timezoneOffSet: 330,
@@ -222,7 +243,11 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     };
 
     if (dryRun) {
-      const msg = `Dry-run OK (no tab opened): session active, passTy="${passTyId}" for ${todayStr}.`;
+      const typesNote = resolvedType.allLabels.length
+        ? `types=[${resolvedType.allLabels.join(', ')}]`
+        : `passTy="${resolvedType.id}"`;
+      const dupNote = alreadyExists ? ' (note: pass already exists today)' : '';
+      const msg = `Dry-run OK: using "${resolvedType.label || resolvedType.id}" (${typesNote})${dupNote}.`;
       await chrome.storage.local.set({
         lastStatus: msg,
         lastRunAt: new Date().toISOString(),
