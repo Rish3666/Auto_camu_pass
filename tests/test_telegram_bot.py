@@ -180,3 +180,37 @@ def test_build_application_registers_thu_fri_job(tmp_path, monkeypatch):
     assert app.job_queue is not None
     job_names = [job.name for job in app.job_queue.jobs()]
     assert "thu_fri_gatepass_batch" in job_names
+
+
+def test_camu_client_json_api_payload_and_pass_resolution():
+    from camu_client import build_crtlv_payload, build_utc_iso_from_ist, resolve_pass_type
+
+    types_list = [
+        {"passCd": "DAY_PASS", "code": "Day Outing"},
+        {"passCd": "WEEK_END_PASS", "code": "Week End Gate Pass"},
+    ]
+    resolved = resolve_pass_type(types_list, "Week End Gate Pass")
+    assert resolved["id"] == "WEEK_END_PASS"
+    assert resolved["label"] == "Week End Gate Pass"
+
+    # 06:00 IST = 00:30 UTC; 20:00 IST = 14:30 UTC
+    assert build_utc_iso_from_ist("2026-11-27", "06:00") == "2026-11-27T00:30:00.000Z"
+    assert build_utc_iso_from_ist("2026-11-29", "20:00") == "2026-11-29T14:30:00.000Z"
+
+    payload = build_crtlv_payload(
+        profile={"studentId": "stu123", "institutionId": "in456", "loggedInId": "log789", "name": "Test Student"},
+        resolved_type=resolved,
+        friday_date_str="2026-11-27",
+        sunday_date_str="2026-11-29",
+        out_time="06:00",
+        in_time="20:00",
+        reason="Weekend outing",
+    )
+    assert payload["passTy"] == "WEEK_END_PASS"
+    assert payload["FrDt"] == "2026-11-27T00:00:00.000Z"
+    assert payload["ToDt"] == "2026-11-29T00:00:00.000Z"
+    assert payload["GateOutPass"] == "true"
+    assert payload["HstleReq"] == "true"
+    assert payload["timezoneOffSet"] == 330
+    assert payload["PerId"] == "stu123"
+

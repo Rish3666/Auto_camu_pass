@@ -93,8 +93,9 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
-- **2026-11-27 (Telegram Bot Hardening):**
-  - Hardened `telegram_bot.py` & `db.py` (preserving the Thursday & Friday `days=(4, 5)` schedule): switched to escaped HTML (`ParseMode.HTML`) to prevent Markdown parse crashes on `dry_run`/underscores, added 24h `HH:MM` time validation, added `last_submitted_date`/`last_status` SQLite tracking & deduplication, per-user concurrency locks, screenshot cleanup, inline action buttons on `/status`, `/help` + `BotCommand` menu, automatic `.env` loading, `Dockerfile` + `.env.example`, and `tests/test_telegram_bot.py`.
+- **2026-11-27 (Telegram Bot & JSON API Worker Hardening):**
+  - Switched `camu_client.py` (used by `telegram_bot.py` & `runner.py`) from DOM clicking to direct JSON REST API requests (`POST /api/Leave/getAllleave/`, `POST /api/gatepasses/fetch-gatepasses-types`, `POST /api/Leave/crtLv`) with `WEEK_END_PASS` and Friday→Sunday weekend dates matching `extension/background.js` (`v0.1.0`).
+  - Hardened `telegram_bot.py` & `db.py` (preserving the Thursday & Friday `days=(4, 5)` schedule): switched to escaped HTML (`ParseMode.HTML`) to prevent Markdown parse crashes on `dry_run`/underscores, added 24h `HH:MM` time validation, added `last_submitted_date`/`last_status` SQLite tracking & per-weekend deduplication, per-user concurrency locks, screenshot cleanup, inline action buttons on `/status`, `/help` + `BotCommand` menu, automatic `.env` loading, `Dockerfile` + `.env.example`, and `tests/test_telegram_bot.py`.
 - **2026-11-27 (`v0.1.0` — Beta 1):**
   - Promoted the extension from Alpha (`v0.0.x`) to **Beta 1 (`v0.1.0`)**.
   - Updated versioning scheme (`0.0.x` = Alpha, `0.1.x` = Beta, `1.0.0+` = Stable) in `AGENTS.md`, `manifest.json`, and `.github/workflows/release_extension.yml`.
