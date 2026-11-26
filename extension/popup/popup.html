@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auto Camu Pass</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Auto Camu Pass</h1>
+      <span class="subtitle">Tuesdays 09:00–23:00</span>
+    </header>
+
+    <div id="status-banner" class="status-banner">Not configured yet</div>
+
+    <form id="settings-form">
+      <label class="toggle-row">
+        <span>Auto-submit on Tuesdays</span>
+        <input type="checkbox" id="enabled" />
+      </label>
+
+      <label>
+        Camu Username / Email
+        <input type="text" id="username" placeholder="student@college.edu" required />
+      </label>
+
+      <label>
+        Camu Password
+        <input type="password" id="password" placeholder="Stored locally only" required />
+      </label>
+
+      <label>
+        Pass Type
+        <input type="text" id="passType" placeholder="Day Outing" value="Day Outing" />
+      </label>
+
+      <label>
+        Reason
+        <input type="text" id="reason" placeholder="Personal work" value="Personal work" />
+      </label>
+
+      <div class="time-row">
+        <label>
+          Out Time
+          <input type="time" id="outTime" value="10:00" />
+        </label>
+        <label>
+          In Time
+          <input type="time" id="inTime" value="20:00" />
+        </label>
+      </div>
+
+      <button type="submit" class="btn primary">Save Settings</button>
+    </form>
+
+    <div class="actions">
+      <button id="dry-run-btn" type="button" class="btn secondary">Dry-Run Test</button>
+      <button id="submit-now-btn" type="button" class="btn accent">Submit Now</button>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
