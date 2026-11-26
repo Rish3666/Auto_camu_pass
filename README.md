@@ -46,6 +46,14 @@ docker build -t auto-camu-bot .
 docker run -d --name auto-camu-bot --env-file .env -v $(pwd)/data:/app/data auto-camu-bot
 ```
 
+### What is `CAMU_SECRET_KEY` and how do I get it?
+- `CAMU_SECRET_KEY` is **not** from Camu — it is a private Fernet (AES) encryption key you generate yourself to encrypt/decrypt stored Camu passwords in `data/users.db` (Telegram bot) or `users.enc` (GitHub Actions).
+- Generate one locally by running:
+  ```bash
+  python crypto_helper.py keygen
+  ```
+- Paste the generated key into your `.env` file (`CAMU_SECRET_KEY=...`) or your hosting/GitHub Actions secrets. **Never commit `.env` or this key to Git**, and keep a backup (changing the key invalidates previously encrypted passwords in `data/users.db`).
+
 ---
 
 ## 3. GitHub Actions Batch Runner
