@@ -88,6 +88,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.0.0-alpha.10`):**
+  - Fixed flex text overflow in the popup profile card (`extension/popup/popup.html`, `extension/popup/popup.css`) by adding `flex: 1; min-width: 0; overflow: hidden;` on `.profile-info` and `.profile-text` so long names/emails truncate cleanly with ellipsis instead of overlapping the `Re-sync` button.
 - **2026-11-27 (`v1.0.0-alpha.9`):**
   - Added live Camu check (`checkCamuSubmittedToday()` via `POST /api/Leave/getAllleave/` + `CHECK_TODAY_STATUS`) so manual gate pass submissions on `student.camu.in` also update the popup **`Submitted`** pin and green `OK` toolbar badge.
 - **2026-11-27 (`v1.0.0-alpha.8`):**

@@ -109,7 +109,15 @@ h1 {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
+}
+
+.profile-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .avatar {
