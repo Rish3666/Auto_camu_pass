@@ -88,6 +88,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-26 (`v1.0.0-alpha.3`):**
+  - Added built-in `chrome.webRequest` API Recorder in `extension/background.js` and `extension/popup/*` (`Start recording`, `Copy API log`, `Clear log`) to capture Camu's XHR/fetch endpoints & payloads with DevTools closed (passwords/tokens auto-redacted). Once captured once, endpoints will be converted to silent `fetch()` mode for all users.
 - **2026-11-26 (`v1.0.0-alpha.2`):**
   - Registered `extension/content.js` as a persistent `content_scripts` entry on `https://student.camu.in/*` so opening/logging into Camu automatically syncs student details (`PROFILE_SYNCED`) without requiring a manual test run first.
   - Added "Open Camu" / "Re-sync" action (`OPEN_CAMU_AND_SYNC`) in `extension/background.js` and recursive storage + DOM profile extraction in `extension/content.js`.

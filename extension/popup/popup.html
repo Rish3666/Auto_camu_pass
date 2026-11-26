@@ -90,6 +90,18 @@
       <button id="dry-run-btn" type="button" class="btn btn-outline">Dry-run</button>
       <button id="submit-now-btn" type="button" class="btn btn-secondary">Submit now</button>
     </div>
+
+    <details class="details">
+      <summary>API Recorder <span class="muted" id="capture-count">(0 captured)</span></summary>
+      <div class="details-body">
+        <div class="muted">Record once with DevTools closed while using Camu, then copy log.</div>
+        <div class="grid-2">
+          <button id="capture-toggle-btn" type="button" class="btn btn-outline btn-sm">Start recording</button>
+          <button id="copy-log-btn" type="button" class="btn btn-secondary btn-sm">Copy API log</button>
+        </div>
+        <button id="clear-log-btn" type="button" class="btn btn-outline btn-sm btn-full">Clear log</button>
+      </div>
+    </details>
   </div>
   <script src="popup.js"></script>
 </body>

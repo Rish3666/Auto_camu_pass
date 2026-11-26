@@ -27,7 +27,13 @@ function renderProfile(profile) {
 }
 
 async function loadSettings() {
-  const data = await chrome.storage.local.get([...FIELDS, 'lastStatus', 'fetchedProfile']);
+  const data = await chrome.storage.local.get([
+    ...FIELDS,
+    'lastStatus',
+    'fetchedProfile',
+    'captureEnabled',
+    'capturedApis',
+  ]);
   document.getElementById('enabled').checked = data.enabled ?? true;
   document.getElementById('username').value = data.username || '';
   document.getElementById('password').value = data.password || '';
@@ -40,6 +46,42 @@ async function loadSettings() {
     setBanner(data.lastStatus);
   }
   renderProfile(data.fetchedProfile);
+  renderCaptureState(Boolean(data.captureEnabled), (data.capturedApis || []).length);
+}
+
+function renderCaptureState(captureEnabled, count) {
+  const toggleBtn = document.getElementById('capture-toggle-btn');
+  const countEl = document.getElementById('capture-count');
+  countEl.textContent = `(${count} captured)`;
+  toggleBtn.textContent = captureEnabled ? 'Stop recording' : 'Start recording';
+}
+
+async function toggleCapture() {
+  const { captureEnabled = false, capturedApis = [] } = await chrome.storage.local.get([
+    'captureEnabled',
+    'capturedApis',
+  ]);
+  const next = !captureEnabled;
+  await chrome.runtime.sendMessage({ action: 'TOGGLE_CAPTURE', enabled: next });
+  renderCaptureState(next, capturedApis.length);
+  setBanner(next ? 'Recording Camu API requests...' : 'API recording stopped.');
+}
+
+async function copyApiLog() {
+  const { capturedApis = [] } = await chrome.storage.local.get('capturedApis');
+  if (capturedApis.length === 0) {
+    setBanner('No API requests captured yet.');
+    return;
+  }
+  await navigator.clipboard.writeText(JSON.stringify(capturedApis, null, 2));
+  setBanner(`Copied ${capturedApis.length} API request(s) to clipboard.`);
+}
+
+async function clearApiLog() {
+  const { captureEnabled = false } = await chrome.storage.local.get('captureEnabled');
+  await chrome.runtime.sendMessage({ action: 'CLEAR_CAPTURED_APIS' });
+  renderCaptureState(captureEnabled, 0);
+  setBanner('Cleared captured API log.');
 }
 
 async function saveSettings(event) {
@@ -98,4 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('sync-btn').addEventListener('click', openCamuAndSync);
   document.getElementById('dry-run-btn').addEventListener('click', () => triggerRun(true));
   document.getElementById('submit-now-btn').addEventListener('click', () => triggerRun(false));
+  document.getElementById('capture-toggle-btn').addEventListener('click', toggleCapture);
+  document.getElementById('copy-log-btn').addEventListener('click', copyApiLog);
+  document.getElementById('clear-log-btn').addEventListener('click', clearApiLog);
 });

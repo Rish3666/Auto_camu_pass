@@ -194,6 +194,51 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
+function decodeRequestBody(requestBody) {
+  if (!requestBody) return null;
+  if (requestBody.formData) return requestBody.formData;
+  if (requestBody.raw && requestBody.raw.length > 0) {
+    try {
+      const decoder = new TextDecoder('utf-8');
+      const rawText = requestBody.raw.map((part) => (part.bytes ? decoder.decode(part.bytes) : '')).join('');
+      const parsed = JSON.parse(rawText);
+      if (parsed && typeof parsed === 'object') {
+        for (const key of Object.keys(parsed)) {
+          if (/pass|pwd|secret|token/i.test(key)) parsed[key] = '***REDACTED***';
+        }
+      }
+      return parsed;
+    } catch (_) {
+      return '[binary/non-json body]';
+    }
+  }
+  return null;
+}
+
+chrome.webRequest.onBeforeRequest.addListener(
+  (details) => {
+    if (details.type !== 'xmlhttprequest' && details.type !== 'fetch') return;
+    (async () => {
+      const { captureEnabled = false, capturedApis = [] } = await chrome.storage.local.get([
+        'captureEnabled',
+        'capturedApis',
+      ]);
+      if (!captureEnabled) return;
+
+      const entry = {
+        time: new Date().toISOString(),
+        method: details.method,
+        url: details.url,
+        body: decodeRequestBody(details.requestBody),
+      };
+      const updated = [...capturedApis.slice(-39), entry];
+      await chrome.storage.local.set({ capturedApis: updated });
+    })();
+  },
+  { urls: ['https://student.camu.in/*'] },
+  ['requestBody']
+);
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     if (message.action === 'PROFILE_SYNCED' && message.profile) {
@@ -205,6 +250,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.action === 'OPEN_CAMU_AND_SYNC') {
       const result = await openOrFocusCamuAndSync();
       sendResponse(result);
+      return;
+    }
+
+    if (message.action === 'TOGGLE_CAPTURE') {
+      const enabled = Boolean(message.enabled);
+      await chrome.storage.local.set({ captureEnabled: enabled });
+      sendResponse({ ok: true, captureEnabled: enabled });
+      return;
+    }
+
+    if (message.action === 'CLEAR_CAPTURED_APIS') {
+      await chrome.storage.local.set({ capturedApis: [] });
+      sendResponse({ ok: true });
       return;
     }
 
