@@ -30,7 +30,7 @@ The repository supports **three independent delivery modes** sharing the same co
 | `notifier.py` | Discord webhook & Telegram batch summary reporter. |
 | `.github/workflows/weekly_batch.yml` | Tuesday 04:30 UTC (10:00 AM IST) batch runner + `workflow_dispatch` dry-run. |
 | `.github/workflows/release_extension.yml` | Packages `extension/` into a `.zip` and attaches it to GitHub Releases on `v*` tags. |
-| `tests/` | `pytest` unit tests (`test_core.py`, `test_db.py`). |
+| `tests/` | `pytest` unit tests (`test_core.py`, `test_db.py`, `test_telegram_bot.py`). |
 
 ---
 
@@ -93,6 +93,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (Telegram Bot Hardening):**
+  - Hardened `telegram_bot.py` & `db.py` (preserving the Thursday & Friday `days=(4, 5)` schedule): switched to escaped HTML (`ParseMode.HTML`) to prevent Markdown parse crashes on `dry_run`/underscores, added 24h `HH:MM` time validation, added `last_submitted_date`/`last_status` SQLite tracking & deduplication, per-user concurrency locks, screenshot cleanup, inline action buttons on `/status`, `/help` + `BotCommand` menu, automatic `.env` loading, `Dockerfile` + `.env.example`, and `tests/test_telegram_bot.py`.
 - **2026-11-27 (`v0.1.0` — Beta 1):**
   - Promoted the extension from Alpha (`v0.0.x`) to **Beta 1 (`v0.1.0`)**.
   - Updated versioning scheme (`0.0.x` = Alpha, `0.1.x` = Beta, `1.0.0+` = Stable) in `AGENTS.md`, `manifest.json`, and `.github/workflows/release_extension.yml`.

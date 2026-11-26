@@ -24,7 +24,7 @@ def _connect(db_path: Path) -> sqlite3.Connection:
 
 
 def init_db(db_path: Path = Path("data/users.db")) -> None:
-    """Create the users table if it does not exist."""
+    """Create the users table if it does not exist, migrating columns if needed."""
     with _connect(db_path) as conn:
         conn.execute(
             """
@@ -34,16 +34,23 @@ def init_db(db_path: Path = Path("data/users.db")) -> None:
                 name TEXT NOT NULL,
                 camu_username TEXT NOT NULL,
                 camu_password_enc BLOB NOT NULL,
-                pass_type TEXT NOT NULL DEFAULT 'Day Outing',
-                reason TEXT NOT NULL DEFAULT 'Personal work',
-                out_time TEXT NOT NULL DEFAULT '10:00',
+                pass_type TEXT NOT NULL DEFAULT 'Week End Gate Pass',
+                reason TEXT NOT NULL DEFAULT 'Weekend outing',
+                out_time TEXT NOT NULL DEFAULT '06:00',
                 in_time TEXT NOT NULL DEFAULT '20:00',
                 enabled INTEGER NOT NULL DEFAULT 1,
+                last_submitted_date TEXT,
+                last_status TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
             """
         )
+        existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+        if "last_submitted_date" not in existing_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN last_submitted_date TEXT")
+        if "last_status" not in existing_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN last_status TEXT")
 
 
 def upsert_user(
@@ -53,9 +60,9 @@ def upsert_user(
     name: str,
     camu_username: str,
     camu_password: str,
-    pass_type: str = "Day Outing",
-    reason: str = "Personal work",
-    out_time: str = "10:00",
+    pass_type: str = "Week End Gate Pass",
+    reason: str = "Weekend outing",
+    out_time: str = "06:00",
     in_time: str = "20:00",
     db_path: Path = Path("data/users.db"),
     secret_key: str | None = None,
@@ -112,6 +119,8 @@ def _row_to_user(row: sqlite3.Row, fernet: Fernet, *, include_password: bool) ->
         "out_time": row["out_time"],
         "in_time": row["in_time"],
         "enabled": bool(row["enabled"]),
+        "last_submitted_date": row["last_submitted_date"],
+        "last_status": row["last_status"],
     }
     if include_password:
         data["password"] = fernet.decrypt(row["camu_password_enc"]).decode("utf-8")
@@ -159,6 +168,30 @@ def delete_user(telegram_user_id: int, *, db_path: Path = Path("data/users.db"))
     init_db(db_path)
     with _connect(db_path) as conn:
         cur = conn.execute("DELETE FROM users WHERE telegram_user_id = ?", (telegram_user_id,))
+        return cur.rowcount > 0
+
+
+def record_submission_status(
+    telegram_user_id: int,
+    *,
+    status: str,
+    submitted_date: str | None = None,
+    db_path: Path = Path("data/users.db"),
+) -> bool:
+    """Record the latest submission status and optionally last_submitted_date."""
+    init_db(db_path)
+    now = datetime.now(timezone.utc).isoformat()
+    with _connect(db_path) as conn:
+        if submitted_date:
+            cur = conn.execute(
+                "UPDATE users SET last_status = ?, last_submitted_date = ?, updated_at = ? WHERE telegram_user_id = ?",
+                (status, submitted_date, now, telegram_user_id),
+            )
+        else:
+            cur = conn.execute(
+                "UPDATE users SET last_status = ?, updated_at = ? WHERE telegram_user_id = ?",
+                (status, now, telegram_user_id),
+            )
         return cur.rowcount > 0
 
 

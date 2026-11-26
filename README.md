@@ -31,12 +31,19 @@ Each friend installs the extension in Chrome/Brave/Edge, saves their own credent
 
 ## 2. Self-Service Telegram Bot (24/7 Cloud)
 
-Friends message your bot with `/register`, `/test`, `/pause`, `/resume`, `/delete`.
+Friends message your bot with `/register`, `/status` (with inline quick-action buttons), `/test`, `/submit`, `/pause`, `/resume`, `/delete`.
 
 ```bash
+cp .env.example .env
 export TELEGRAM_BOT_TOKEN="your-botfather-token"
 export CAMU_SECRET_KEY="$(python crypto_helper.py keygen)"
 python telegram_bot.py
+```
+
+Or run 24/7 with Docker:
+```bash
+docker build -t auto-camu-bot .
+docker run -d --name auto-camu-bot --env-file .env -v $(pwd)/data:/app/data auto-camu-bot
 ```
 
 ---
