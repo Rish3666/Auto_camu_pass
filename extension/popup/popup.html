@@ -11,7 +11,7 @@
     <header class="header">
       <div class="header-left">
         <h1>Auto Camu Pass</h1>
-        <p class="muted">Weekly gate pass automation</p>
+        <p class="muted">Silent Tuesday gate pass automation</p>
       </div>
       <span class="badge badge-outline">Tue · 09–23</span>
     </header>
@@ -37,7 +37,7 @@
       <label class="switch-card" for="enabled">
         <div>
           <div class="switch-title">Auto-submit on Tuesdays</div>
-          <div class="switch-desc">Checks every 15m while Chrome is open</div>
+          <div class="switch-desc">Runs silently in background every 15m</div>
         </div>
         <span class="switch">
           <input type="checkbox" id="enabled" />
@@ -54,7 +54,7 @@
         </div>
         <div class="field">
           <label for="reason">Reason</label>
-          <input type="text" id="reason" placeholder="Personal work" value="Personal work" />
+          <input type="text" id="reason" placeholder="Outing" value="Outing" />
         </div>
       </div>
 
@@ -69,20 +69,6 @@
         </div>
       </div>
 
-      <details class="details">
-        <summary>Auto-login credentials <span class="muted">(optional)</span></summary>
-        <div class="details-body">
-          <div class="field">
-            <label for="username">Camu username / email</label>
-            <input type="text" id="username" placeholder="student@college.edu" />
-          </div>
-          <div class="field">
-            <label for="password">Camu password</label>
-            <input type="password" id="password" placeholder="Stored locally in Chrome" />
-          </div>
-        </div>
-      </details>
-
       <button type="submit" class="btn btn-primary btn-full">Save changes</button>
     </form>
 
@@ -90,18 +76,6 @@
       <button id="dry-run-btn" type="button" class="btn btn-outline">Dry-run</button>
       <button id="submit-now-btn" type="button" class="btn btn-secondary">Submit now</button>
     </div>
-
-    <details class="details">
-      <summary>API Recorder <span class="muted" id="capture-count">(0 captured)</span></summary>
-      <div class="details-body">
-        <div class="muted">Record once with DevTools closed while using Camu, then copy log.</div>
-        <div class="grid-2">
-          <button id="capture-toggle-btn" type="button" class="btn btn-outline btn-sm">Start recording</button>
-          <button id="copy-log-btn" type="button" class="btn btn-secondary btn-sm">Copy API log</button>
-        </div>
-        <button id="clear-log-btn" type="button" class="btn btn-outline btn-sm btn-full">Clear log</button>
-      </div>
-    </details>
   </div>
   <script src="popup.js"></script>
 </body>

@@ -1,10 +1,11 @@
 /**
  * Background Service Worker for Auto Camu Pass (Manifest V3).
- * Uses chrome.alarms + chrome.storage.local (no ephemeral in-memory state).
+ * Uses silent fetch() against Camu's REST APIs (no tabs opened).
  */
 
 const ALARM_NAME = 'camu-tuesday-check';
-const CAMU_URL = 'https://student.camu.in/v2/profile';
+const CAMU_BASE = 'https://student.camu.in';
+const CAMU_PROFILE_URL = `${CAMU_BASE}/v2/profile`;
 
 function getLocalDateString(now = new Date()) {
   const year = now.getFullYear();
@@ -61,14 +62,14 @@ async function waitForTabComplete(tabId, timeoutMs = 25000) {
 }
 
 async function openOrFocusCamuAndSync() {
-  const existingTabs = await chrome.tabs.query({ url: 'https://student.camu.in/*' });
+  const existingTabs = await chrome.tabs.query({ url: `${CAMU_BASE}/*` });
   let tab;
   if (existingTabs.length > 0) {
     tab = existingTabs[0];
     await chrome.tabs.update(tab.id, { active: true });
     await chrome.windows.update(tab.windowId, { focused: true });
   } else {
-    tab = await chrome.tabs.create({ url: CAMU_URL, active: true });
+    tab = await chrome.tabs.create({ url: CAMU_PROFILE_URL, active: true });
   }
 
   await waitForTabComplete(tab.id);
@@ -88,20 +89,80 @@ async function openOrFocusCamuAndSync() {
   }
 }
 
+async function camuPost(path, body) {
+  const init = {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+  };
+  if (body !== null && body !== undefined) {
+    init.body = JSON.stringify(body);
+  }
+  const resp = await fetch(`${CAMU_BASE}${path}`, init);
+  const text = await resp.text();
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch (_) {}
+
+  if (!resp.ok) {
+    throw new Error(`HTTP ${resp.status} on ${path}: ${text.slice(0, 120)}`);
+  }
+  return json ?? text;
+}
+
+function extractTypesList(apiResponse) {
+  const candidates = [
+    apiResponse?.output?.data,
+    apiResponse?.data,
+    apiResponse?.output,
+    apiResponse,
+  ];
+  for (const c of candidates) {
+    if (Array.isArray(c) && c.length > 0) return c;
+  }
+  return [];
+}
+
+function resolvePassTypeId(typesList, desiredLabel) {
+  if (!typesList.length) return desiredLabel || 'Outing';
+  const target = (desiredLabel || '').trim().toLowerCase();
+  const match = typesList.find((item) => {
+    const label = String(item.Nm || item.name || item.PassTy || item.type || item.label || '').toLowerCase();
+    return target && (label === target || label.includes(target));
+  });
+  const chosen = match || typesList[0];
+  return chosen._id || chosen.id || chosen.code || chosen.Nm || desiredLabel;
+}
+
+function buildUtcIso(dateStr, timeStr) {
+  const dt = new Date(`${dateStr}T${timeStr || '10:00'}:00`);
+  return Number.isNaN(dt.getTime()) ? `${dateStr}T04:30:00.000Z` : dt.toISOString();
+}
+
 async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
   const config = await chrome.storage.local.get([
     'enabled',
-    'username',
-    'password',
     'passType',
     'reason',
     'outTime',
     'inTime',
     'lastSubmittedDate',
+    'fetchedProfile',
   ]);
 
   if (!manual && !config.enabled) {
     return { ok: false, skipped: true, message: 'Auto-submit is paused.' };
+  }
+
+  const profile = config.fetchedProfile;
+  if (!profile?.studentId) {
+    const msg = 'Camu profile not synced yet. Click "Open Camu" once while logged in.';
+    await chrome.storage.local.set({ lastStatus: msg });
+    return { ok: false, message: msg };
   }
 
   const todayStr = getLocalDateString();
@@ -109,67 +170,87 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     return { ok: true, skipped: true, message: `Already submitted today (${todayStr}).` };
   }
 
-  let tab;
   try {
-    tab = await chrome.tabs.create({ url: CAMU_URL, active: dryRun });
-    await waitForTabComplete(tab.id);
-
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['content.js'],
+    // 1. Verify active Camu session & check for existing passes today
+    const leavesRes = await camuPost('/api/Leave/getAllleave/', {
+      StuID: profile.studentId,
+      isFrmReact: true,
     });
-
-    const response = await chrome.tabs.sendMessage(tab.id, {
-      action: 'SUBMIT_GATEPASS',
-      payload: {
-        username: config.username || '',
-        password: config.password || '',
-        passType: config.passType || 'Day Outing',
-        reason: config.reason || 'Personal work',
-        outTime: config.outTime || '10:00',
-        inTime: config.inTime || '20:00',
-        dateStr: todayStr,
-        dryRun,
-      },
-    });
-
-    const statusText = response?.message || 'Completed.';
-    const baseUpdates = response?.profile ? { fetchedProfile: response.profile } : {};
-    if (response?.ok) {
-      const updates = {
-        ...baseUpdates,
-        lastStatus: dryRun ? `Dry-run OK (${todayStr})` : `Submitted (${todayStr})`,
-        lastRunAt: new Date().toISOString(),
-      };
-      if (!dryRun) {
-        updates.lastSubmittedDate = todayStr;
-      }
-      await chrome.storage.local.set(updates);
-      await showNotification('Auto Camu Pass', updates.lastStatus);
-    } else {
+    const existingLeaves = extractTypesList(leavesRes);
+    const alreadyExists = existingLeaves.some((lv) =>
+      String(lv.FrDt || lv.frdt || '').startsWith(todayStr)
+    );
+    if (alreadyExists && !dryRun && !manual) {
       await chrome.storage.local.set({
-        ...baseUpdates,
-        lastStatus: `Failed: ${statusText}`,
+        lastSubmittedDate: todayStr,
+        lastStatus: `Already exists in Camu (${todayStr})`,
+      });
+      return { ok: true, skipped: true, message: `Pass already exists in Camu for ${todayStr}.` };
+    }
+
+    // 2. Fetch pass types and resolve passTy ID
+    const typesRes = await camuPost('/api/gatepasses/fetch-gatepasses-types', null);
+    const typesList = extractTypesList(typesRes);
+    const passTyId = resolvePassTypeId(typesList, config.passType || 'Day Outing');
+
+    const outTime = config.outTime || '10:00';
+    const inTime = config.inTime || '20:00';
+
+    const payload = {
+      Attachments: [],
+      FrDt: `${todayStr}T00:00:00.000Z`,
+      GateOutPass: true,
+      HstleReq: 'true',
+      InId: profile.institutionId || '',
+      LvTy: 'Leave',
+      PerId: profile.studentId,
+      PerNm: profile.name || '',
+      PerTy: 'Student',
+      PtAb: '',
+      Rson: '',
+      Sson: '',
+      ToDt: `${todayStr}T00:00:00.000Z`,
+      atcmnt: [],
+      frdt: buildUtcIso(todayStr, outTime),
+      loggedInId: profile.loggedInId || profile.studentId,
+      passTy: passTyId,
+      periods: [],
+      rson: config.reason || 'Outing',
+      timezoneOffSet: 330,
+      todt: buildUtcIso(todayStr, inTime),
+    };
+
+    if (dryRun) {
+      const msg = `Dry-run OK (no tab opened): session active, passTy="${passTyId}" for ${todayStr}.`;
+      await chrome.storage.local.set({
+        lastStatus: msg,
         lastRunAt: new Date().toISOString(),
       });
-      await showNotification('Auto Camu Pass — Failed', statusText);
+      return { ok: true, message: msg, payloadPreview: payload };
     }
 
-    return response || { ok: false, message: 'No response from Camu page.' };
-  } catch (err) {
-    const msg = err?.message || String(err);
+    // 3. Silent POST to /api/Leave/crtLv
+    await camuPost('/api/Leave/crtLv', payload);
+
+    const okMsg = `Submitted silently (${todayStr} ${outTime}–${inTime})`;
     await chrome.storage.local.set({
-      lastStatus: `Error: ${msg}`,
+      lastSubmittedDate: todayStr,
+      lastStatus: okMsg,
       lastRunAt: new Date().toISOString(),
     });
-    await showNotification('Auto Camu Pass — Error', msg);
-    return { ok: false, message: msg };
-  } finally {
-    if (tab?.id && !dryRun) {
-      try {
-        await chrome.tabs.remove(tab.id);
-      } catch (_) {}
-    }
+    await showNotification('Auto Camu Pass', okMsg);
+    return { ok: true, message: okMsg };
+  } catch (err) {
+    const msg = err?.message || String(err);
+    const friendly = /401|403|HTML|login/i.test(msg)
+      ? 'Camu session expired. Click "Open Camu" to log in again.'
+      : msg;
+    await chrome.storage.local.set({
+      lastStatus: `Failed: ${friendly}`,
+      lastRunAt: new Date().toISOString(),
+    });
+    await showNotification('Auto Camu Pass — Failed', friendly);
+    return { ok: false, message: friendly };
   }
 }
 
@@ -194,51 +275,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
-function decodeRequestBody(requestBody) {
-  if (!requestBody) return null;
-  if (requestBody.formData) return requestBody.formData;
-  if (requestBody.raw && requestBody.raw.length > 0) {
-    try {
-      const decoder = new TextDecoder('utf-8');
-      const rawText = requestBody.raw.map((part) => (part.bytes ? decoder.decode(part.bytes) : '')).join('');
-      const parsed = JSON.parse(rawText);
-      if (parsed && typeof parsed === 'object') {
-        for (const key of Object.keys(parsed)) {
-          if (/pass|pwd|secret|token/i.test(key)) parsed[key] = '***REDACTED***';
-        }
-      }
-      return parsed;
-    } catch (_) {
-      return '[binary/non-json body]';
-    }
-  }
-  return null;
-}
-
-chrome.webRequest.onBeforeRequest.addListener(
-  (details) => {
-    if (details.type !== 'xmlhttprequest' && details.type !== 'fetch') return;
-    (async () => {
-      const { captureEnabled = false, capturedApis = [] } = await chrome.storage.local.get([
-        'captureEnabled',
-        'capturedApis',
-      ]);
-      if (!captureEnabled) return;
-
-      const entry = {
-        time: new Date().toISOString(),
-        method: details.method,
-        url: details.url,
-        body: decodeRequestBody(details.requestBody),
-      };
-      const updated = [...capturedApis.slice(-39), entry];
-      await chrome.storage.local.set({ capturedApis: updated });
-    })();
-  },
-  { urls: ['https://student.camu.in/*'] },
-  ['requestBody']
-);
-
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     if (message.action === 'PROFILE_SYNCED' && message.profile) {
@@ -250,19 +286,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.action === 'OPEN_CAMU_AND_SYNC') {
       const result = await openOrFocusCamuAndSync();
       sendResponse(result);
-      return;
-    }
-
-    if (message.action === 'TOGGLE_CAPTURE') {
-      const enabled = Boolean(message.enabled);
-      await chrome.storage.local.set({ captureEnabled: enabled });
-      sendResponse({ ok: true, captureEnabled: enabled });
-      return;
-    }
-
-    if (message.action === 'CLEAR_CAPTURED_APIS') {
-      await chrome.storage.local.set({ capturedApis: [] });
-      sendResponse({ ok: true });
       return;
     }
 

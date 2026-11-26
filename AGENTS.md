@@ -88,6 +88,10 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.0.0-alpha.4`):**
+  - Switched Chrome Extension (`extension/background.js`) to **100% silent `fetch()` mode** using the captured Camu endpoints (`POST /api/Leave/getAllleave/`, `POST /api/gatepasses/fetch-gatepasses-types`, `POST /api/Leave/crtLv`)—no tabs opened on Dry-Run or Tuesday auto-submit.
+  - Updated `extension/content.js` to extract `StuID`/`PerId`, `InId`, `loggedInId`, and `PerNm` from the logged-in Camu session.
+  - Removed temporary `webRequest` API recorder from `manifest.json` and `popup.html`.
 - **2026-11-26 (`v1.0.0-alpha.3`):**
   - Added built-in `chrome.webRequest` API Recorder in `extension/background.js` and `extension/popup/*` (`Start recording`, `Copy API log`, `Clear log`) to capture Camu's XHR/fetch endpoints & payloads with DevTools closed (passwords/tokens auto-redacted). Once captured once, endpoints will be converted to silent `fetch()` mode for all users.
 - **2026-11-26 (`v1.0.0-alpha.2`):**
