@@ -294,6 +294,8 @@ def submit_gatepass_for_user(
     user: dict[str, Any],
     *,
     dry_run: bool = False,
+    out_date: str | None = None,
+    in_date: str | None = None,
     screenshot_dir: Path = Path("screenshots"),
     timeout_ms: int = 15000,
 ) -> SubmissionResult:
@@ -360,7 +362,9 @@ def submit_gatepass_for_user(
                 screenshot_path=shot,
             )
 
-        friday_str, sunday_str = get_weekend_dates()
+        default_friday, default_sunday = get_weekend_dates()
+        start_date_str = out_date or default_friday
+        end_date_str = in_date or (out_date if out_date else default_sunday)
         out_time = user.get("out_time", "06:00")
         in_time = user.get("in_time", "20:00")
         reason = user.get("reason", "Weekend outing")
@@ -373,13 +377,13 @@ def submit_gatepass_for_user(
         )
         existing_leaves = find_first_array_of_objects(leaves_res)
         already_exists = any(
-            is_gate_pass_entry(lv) and is_leave_for_date(lv, friday_str) for lv in existing_leaves
+            is_gate_pass_entry(lv) and is_leave_for_date(lv, start_date_str) for lv in existing_leaves
         )
         if already_exists and not dry_run:
             return SubmissionResult(
                 name=name,
                 status="skipped",
-                message=f"Weekend gate pass already exists for Fri {friday_str} → Sun {sunday_str}.",
+                message=f"Gate pass already exists for {start_date_str} → {end_date_str}.",
             )
 
         # 4. Direct JSON POST /api/gatepasses/fetch-gatepasses-types
@@ -397,8 +401,8 @@ def submit_gatepass_for_user(
         payload = build_crtlv_payload(
             profile=profile,
             resolved_type=resolved_type,
-            friday_date_str=friday_str,
-            sunday_date_str=sunday_str,
+            friday_date_str=start_date_str,
+            sunday_date_str=end_date_str,
             out_time=out_time,
             in_time=in_time,
             reason=reason,
@@ -410,7 +414,7 @@ def submit_gatepass_for_user(
                 status="dry_run",
                 message=(
                     f"Dry-run OK (JSON API): {resolved_type['label'] or resolved_type['id']} ({resolved_type['id']}) "
-                    f"for Fri {friday_str} ({out_time}) → Sun {sunday_str} ({in_time})."
+                    f"for {start_date_str} ({out_time}) → {end_date_str} ({in_time})."
                 ),
             )
 
@@ -419,7 +423,7 @@ def submit_gatepass_for_user(
         return SubmissionResult(
             name=name,
             status="submitted",
-            message=f"Submitted via JSON API: Fri {friday_str} ({out_time}) → Sun {sunday_str} ({in_time}).",
+            message=f"Submitted via JSON API: {start_date_str} ({out_time}) → {end_date_str} ({in_time}).",
         )
 
     except Exception as exc:

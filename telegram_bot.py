@@ -42,7 +42,7 @@ DEFAULT_REASON = "Weekend outing"
 DEFAULT_OUT_TIME = "06:00"
 DEFAULT_IN_TIME = "20:00"
 
-# Conversation states for /register and /update
+# Conversation states for /register, /update, and /fill
 (
     ASK_NAME,
     ASK_USERNAME,
@@ -53,7 +53,9 @@ DEFAULT_IN_TIME = "20:00"
     UPD_CHOOSE,
     UPD_VALUE,
     UPD_PASSWORD,
-) = range(9)
+    FILL_REASON,
+    FILL_TIMES,
+) = range(11)
 
 # Per-user in-flight lock set to prevent concurrent Playwright launches for the same account
 _IN_FLIGHT_USERS: set[int] = set()
@@ -112,12 +114,28 @@ def _load_dotenv(env_path: Path = Path(".env")) -> None:
             os.environ[key] = value
 
 
-def _run_single_user_sync(user: dict, *, dry_run: bool) -> SubmissionResult:
-    """Execute Playwright submission synchronously for one user (called via asyncio.to_thread)."""
+def get_instant_fill_defaults(now=None) -> tuple[str, str, str]:
+    """Return (today_date_str, start_time_plus_10m, end_time_8pm) in IST."""
+    ref = now or current_ist_date()
+    start_dt = ref + timedelta(minutes=10)
+    date_str = start_dt.strftime("%Y-%m-%d")
+    start_str = start_dt.strftime("%H:%M")
+    end_str = "20:00"
+    return date_str, start_str, end_str
+
+
+def _run_single_user_sync(
+    user: dict,
+    *,
+    dry_run: bool,
+    out_date: str | None = None,
+    in_date: str | None = None,
+) -> SubmissionResult:
+    """Execute Playwright JSON API submission synchronously for one user (called via asyncio.to_thread)."""
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         try:
-            return submit_gatepass_for_user(browser, user, dry_run=dry_run)
+            return submit_gatepass_for_user(browser, user, dry_run=dry_run, out_date=out_date, in_date=in_date)
         finally:
             browser.close()
 
@@ -161,13 +179,14 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "<b>Commands:</b>\n"
         "/register — Set up your Camu credentials &amp; pass defaults\n"
         "/update — Update your name, credentials, pass type, reason, or times\n"
+        "/fill — Fill &amp; submit an outing for today (starts 10 min from now → 8:00 PM, or custom)\n"
         "/status — View your settings &amp; quick action buttons\n"
         "/test — Run a dry-run (fills form &amp; sends screenshot without submitting)\n"
         "/submit — Submit your gate pass right now\n"
         "/pause — Pause weekly auto-submit\n"
         "/resume — Resume weekly auto-submit\n"
         "/delete — Remove your account and credentials permanently\n"
-        "/cancel — Cancel an active registration or update",
+        "/cancel — Cancel an active registration, update, or fill",
         parse_mode=ParseMode.HTML,
     )
 
@@ -183,15 +202,19 @@ def _pass_type_markup() -> InlineKeyboardMarkup:
     )
 
 
-def _reason_markup() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
+def _reason_markup(*, include_skip: bool = True) -> InlineKeyboardMarkup:
+    rows = [
         [
-            [
-                InlineKeyboardButton(DEFAULT_REASON, callback_data=f"reg:reason:{DEFAULT_REASON}"),
-                InlineKeyboardButton("Skip (Default)", callback_data="reg:reason:skip"),
-            ]
-        ]
-    )
+            InlineKeyboardButton("Weekend outing", callback_data="reg:reason:Weekend outing"),
+            InlineKeyboardButton("Festival outing", callback_data="reg:reason:Festival outing"),
+        ],
+        [
+            InlineKeyboardButton("Emergency outing", callback_data="reg:reason:Emergency outing"),
+        ],
+    ]
+    if include_skip:
+        rows[1].append(InlineKeyboardButton("Skip (Default)", callback_data="reg:reason:skip"))
+    return InlineKeyboardMarkup(rows)
 
 
 def _times_markup() -> InlineKeyboardMarkup:
@@ -523,6 +546,164 @@ async def update_password(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return ConversationHandler.END
 
 
+async def fill_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = get_user(update.effective_user.id, db_path=DB_PATH)
+    if not user:
+        await update.message.reply_text("You are not registered yet. Send /register first.")
+        return ConversationHandler.END
+
+    date_str, start_str, end_str = get_instant_fill_defaults()
+    context.user_data.clear()
+    context.user_data["fill_date"] = date_str
+    context.user_data["fill_default_start"] = start_str
+    context.user_data["fill_default_end"] = end_str
+
+    await update.message.reply_text(
+        f"📅 <b>Fill Outing for {_esc(date_str)}</b>\n\n"
+        "1️⃣ Choose your <b>reason</b> below, or type a custom one:",
+        parse_mode=ParseMode.HTML,
+        reply_markup=_reason_markup(include_skip=False),
+    )
+    return FILL_REASON
+
+
+async def _prompt_fill_times(target_msg, context: ContextTypes.DEFAULT_TYPE) -> int:
+    date_str = context.user_data["fill_date"]
+    start_str = context.user_data["fill_default_start"]
+    end_str = context.user_data["fill_default_end"]
+    ok_default, _ = validate_time_pair(start_str, end_str)
+
+    rows = []
+    if ok_default:
+        rows.append(
+            [InlineKeyboardButton(f"✅ Use {start_str} – {end_str} (8:00 PM)", callback_data=f"fill:times:{start_str} {end_str}")]
+        )
+    rows.append([InlineKeyboardButton("❌ Cancel", callback_data="fill:cancel")])
+
+    hint = (
+        f"Default time is <code>{start_str} – {end_str}</code> (10 min from now until 8:00 PM).\n"
+        if ok_default
+        else f"Current time + 10 min (<code>{start_str}</code>) is already past <code>20:00</code>.\n"
+    )
+    await target_msg.reply_text(
+        f"2️⃣ <b>Time for {_esc(date_str)}</b>\n"
+        f"{hint}"
+        "Tap the button to submit, or type custom 24h times (e.g. <code>14:30 20:00</code>):",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(rows),
+    )
+    return FILL_TIMES
+
+
+async def fill_reason_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    val = (update.message.text or "").strip()
+    context.user_data["fill_reason"] = val or DEFAULT_REASON
+    return await _prompt_fill_times(update.message, context)
+
+
+async def fill_reason_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    val = (query.data or "").removeprefix("reg:reason:")
+    chosen = DEFAULT_REASON if not val or val.lower() == "skip" else val
+    context.user_data["fill_reason"] = chosen
+    await query.edit_message_text(f"1️⃣ Reason: <code>{_esc(chosen)}</code>", parse_mode=ParseMode.HTML)
+    return await _prompt_fill_times(query.message, context)
+
+
+async def _execute_fill_submission(update: Update, target_msg, context: ContextTypes.DEFAULT_TYPE, out_time: str, in_time: str) -> int:
+    uid = update.effective_user.id
+    if uid in _IN_FLIGHT_USERS:
+        await target_msg.reply_text("⏳ A run is already in progress for your account. Please wait for it to finish.")
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    user = get_user(uid, include_password=True, db_path=DB_PATH)
+    if not user:
+        await target_msg.reply_text("You are not registered yet. Send /register first.")
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    date_str = context.user_data["fill_date"]
+    reason = context.user_data.get("fill_reason") or user["reason"]
+    override_user = {
+        **user,
+        "reason": reason,
+        "out_time": out_time,
+        "in_time": in_time,
+    }
+    context.user_data.clear()
+
+    _IN_FLIGHT_USERS.add(uid)
+    result: SubmissionResult | None = None
+    try:
+        await target_msg.reply_text(
+            f"⏳ Submitting outing for <code>{_esc(date_str)}</code> "
+            f"(<code>{_esc(out_time)} – {_esc(in_time)}</code>, <code>{_esc(reason)}</code>)...",
+            parse_mode=ParseMode.HTML,
+        )
+        result = await asyncio.to_thread(
+            _run_single_user_sync,
+            override_user,
+            dry_run=False,
+            out_date=date_str,
+            in_date=date_str,
+        )
+        record_submission_status(
+            uid,
+            status=f"{result.status}: {result.message}",
+            submitted_date=date_str if result.status == "submitted" else None,
+            db_path=DB_PATH,
+        )
+        emoji = "✅" if result.status in ("submitted", "skipped") else "❌"
+        await target_msg.reply_text(
+            f"{emoji} <b>{_esc(result.status)}</b>: {_esc(result.message)}",
+            parse_mode=ParseMode.HTML,
+        )
+        if result.screenshot_path and Path(result.screenshot_path).exists():
+            with open(result.screenshot_path, "rb") as photo:
+                await target_msg.reply_photo(photo=photo)
+    finally:
+        _IN_FLIGHT_USERS.discard(uid)
+        if result:
+            _cleanup_screenshot(result.screenshot_path)
+    return ConversationHandler.END
+
+
+async def fill_times_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    val = (update.message.text or "").strip()
+    parts = val.split()
+    if len(parts) != 2:
+        await update.message.reply_text(
+            "Please send two 24h times like <code>14:30 20:00</code> or tap the button above.",
+            parse_mode=ParseMode.HTML,
+        )
+        return FILL_TIMES
+    ok, err_msg = validate_time_pair(parts[0], parts[1])
+    if not ok:
+        await update.message.reply_text(f"{_esc(err_msg)} Try again (e.g. <code>14:30 20:00</code>).", parse_mode=ParseMode.HTML)
+        return FILL_TIMES
+    return await _execute_fill_submission(update, update.message, context, parts[0], parts[1])
+
+
+async def fill_times_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    data = query.data or ""
+    if data == "fill:cancel":
+        context.user_data.clear()
+        await query.edit_message_text("Outing fill cancelled.")
+        return ConversationHandler.END
+    val = data.removeprefix("fill:times:")
+    parts = val.split()
+    if len(parts) != 2:
+        context.user_data.clear()
+        await query.edit_message_text("Invalid time selection.")
+        return ConversationHandler.END
+    await query.edit_message_text(f"2️⃣ Time: <code>{_esc(parts[0])} – {_esc(parts[1])}</code>", parse_mode=ParseMode.HTML)
+    return await _execute_fill_submission(update, query.message, context, parts[0], parts[1])
+
+
 async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = get_user(update.effective_user.id, db_path=DB_PATH)
     if not user:
@@ -691,6 +872,7 @@ async def _post_init(app: Application) -> None:
         [
             BotCommand("register", "Set up your Camu credentials & defaults"),
             BotCommand("update", "Update a saved setting (name, login, pass, reason, time)"),
+            BotCommand("fill", "Fill & submit an outing for today (now+10m to 8:00 PM)"),
             BotCommand("status", "View your saved settings & action buttons"),
             BotCommand("test", "Run a dry-run (no submission)"),
             BotCommand("submit", "Submit your gate pass right now"),
@@ -748,9 +930,25 @@ def build_application() -> Application:
         fallbacks=[CommandHandler("cancel", register_cancel)],
     )
 
+    fill_handler = ConversationHandler(
+        entry_points=[CommandHandler("fill", fill_start)],
+        states={
+            FILL_REASON: [
+                CallbackQueryHandler(fill_reason_cb, pattern=r"^reg:reason:"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, fill_reason_text),
+            ],
+            FILL_TIMES: [
+                CallbackQueryHandler(fill_times_cb, pattern=r"^fill:"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, fill_times_text),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", register_cancel)],
+    )
+
     app.add_handler(CommandHandler(["start", "help"], start_cmd))
     app.add_handler(conv_handler)
     app.add_handler(update_handler)
+    app.add_handler(fill_handler)
     app.add_handler(CommandHandler("status", status_cmd))
     app.add_handler(CommandHandler("pause", pause_cmd))
     app.add_handler(CommandHandler("resume", resume_cmd))

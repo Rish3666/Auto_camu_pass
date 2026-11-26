@@ -256,3 +256,58 @@ async def test_register_inline_buttons_and_update_command(tmp_path, monkeypatch)
     assert get_user(42, db_path=db_file)["reason"] == "Going home"
 
 
+@pytest.mark.asyncio
+async def test_fill_command_uses_now_plus_10_min_to_8pm(tmp_path, monkeypatch):
+    from datetime import datetime
+
+    db_file = tmp_path / "bot.db"
+    key = generate_key()
+    monkeypatch.setattr(telegram_bot, "DB_PATH", db_file)
+    monkeypatch.setenv("CAMU_SECRET_KEY", key)
+
+    fixed_now = datetime(2026, 11, 27, 14, 25, tzinfo=telegram_bot.IST)
+    monkeypatch.setattr(telegram_bot, "current_ist_date", lambda: fixed_now)
+
+    upsert_user(
+        telegram_user_id=55,
+        chat_id=55,
+        name="FillUser",
+        camu_username="f@c.edu",
+        camu_password="pw",
+        db_path=db_file,
+        secret_key=key,
+    )
+
+    ctx = _make_context()
+    assert await telegram_bot.fill_start(_make_update(user_id=55, chat_id=55), ctx) == telegram_bot.FILL_REASON
+    assert ctx.user_data["fill_date"] == "2026-11-27"
+    assert ctx.user_data["fill_default_start"] == "14:35"
+    assert ctx.user_data["fill_default_end"] == "20:00"
+
+    def _cb(data: str):
+        msg = SimpleNamespace(reply_text=AsyncMock(), reply_photo=AsyncMock())
+        q = SimpleNamespace(data=data, answer=AsyncMock(), edit_message_text=AsyncMock(), message=msg)
+        return SimpleNamespace(effective_user=SimpleNamespace(id=55), effective_chat=SimpleNamespace(id=55), callback_query=q)
+
+    assert await telegram_bot.fill_reason_cb(_cb("reg:reason:Festival outing"), ctx) == telegram_bot.FILL_TIMES
+
+    captured = {}
+
+    def fake_run(user, *, dry_run, out_date=None, in_date=None):
+        captured["user"] = user
+        captured["out_date"] = out_date
+        captured["in_date"] = in_date
+        return SubmissionResult(name=user["name"], status="submitted", message="OK")
+
+    with patch("telegram_bot._run_single_user_sync", side_effect=fake_run):
+        res_state = await telegram_bot.fill_times_cb(_cb("fill:times:14:35 20:00"), ctx)
+
+    assert res_state == telegram_bot.ConversationHandler.END
+    assert captured["out_date"] == "2026-11-27"
+    assert captured["in_date"] == "2026-11-27"
+    assert captured["user"]["reason"] == "Festival outing"
+    assert captured["user"]["out_time"] == "14:35"
+    assert captured["user"]["in_time"] == "20:00"
+
+
+
