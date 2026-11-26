@@ -88,6 +88,9 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.0.0-alpha.15`):**
+  - Updated `extension/background.js` (`getWeekendDates()`) and `extension/popup/popup.js` so the Weekend Gate Pass always targets **Friday (Out date) → Sunday (In date)** whether triggered on Thursday or Friday, and deduplicates against that weekend's Friday date.
+  - Cleaned up the Dry-run status message (removed temporary `sample=...` debug JSON).
 - **2026-11-27 (`v1.0.0-alpha.14`):**
   - Locked pass resolution to prefer `WEEK_END_PASS` (`Week End Gate Pass`) over normal Leave passes and migrated any older stored `Day Outing` value in `extension/popup/popup.js`.
 - **2026-11-27 (`v1.0.0-alpha.13`):**

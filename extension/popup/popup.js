@@ -33,12 +33,19 @@ function getLocalDateString(now = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function getWeekendFridayString(now = new Date()) {
+  const day = now.getDay();
+  const daysUntilFriday = day === 5 ? 0 : (5 - day + 7) % 7;
+  const friday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilFriday);
+  return getLocalDateString(friday);
+}
+
 function renderSubmittedPin(lastSubmittedDate) {
   const pin = document.getElementById('submitted-pin');
   const text = document.getElementById('submitted-pin-text');
-  const isSubmittedToday = lastSubmittedDate === getLocalDateString();
-  pin.className = `badge ${isSubmittedToday ? 'badge-submitted' : 'badge-pending'}`;
-  text.textContent = isSubmittedToday ? 'Submitted' : 'Not submitted';
+  const isSubmittedWeekend = lastSubmittedDate === getWeekendFridayString();
+  pin.className = `badge ${isSubmittedWeekend ? 'badge-submitted' : 'badge-pending'}`;
+  text.textContent = isSubmittedWeekend ? 'Submitted' : 'Not submitted';
 }
 
 function renderScriptBadge(enabled) {
@@ -68,9 +75,9 @@ async function loadSettings() {
   try {
     const live = await chrome.runtime.sendMessage({ action: 'CHECK_TODAY_STATUS' });
     if (live?.submittedToday) {
-      renderSubmittedPin(getLocalDateString());
+      renderSubmittedPin(live.weekendDate || getWeekendFridayString());
       if (live.source === 'camu_api') {
-        setBanner(`Submitted in Camu (${getLocalDateString()})`);
+        setBanner(`Submitted in Camu (Fri ${live.weekendDate || getWeekendFridayString()})`);
       }
     }
   } catch (_) {}
@@ -128,7 +135,7 @@ async function triggerRun(dryRun) {
   try {
     const res = await chrome.runtime.sendMessage({ action: 'RUN_NOW', dryRun });
     if (res?.profile) renderProfile(res.profile);
-    if (res?.submittedToday) renderSubmittedPin(getLocalDateString());
+    if (res?.submittedToday) renderSubmittedPin(getWeekendFridayString());
     setBanner(res?.message || 'Done.');
   } catch (err) {
     setBanner(`Error: ${err.message}`);

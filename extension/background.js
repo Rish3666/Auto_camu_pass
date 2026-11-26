@@ -14,6 +14,17 @@ function getLocalDateString(now = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function getWeekendDates(now = new Date()) {
+  const day = now.getDay(); // 0=Sun..6=Sat
+  const daysUntilFriday = day === 5 ? 0 : (5 - day + 7) % 7;
+  const friday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilFriday);
+  const sunday = new Date(friday.getFullYear(), friday.getMonth(), friday.getDate() + 2);
+  return {
+    fridayDateStr: getLocalDateString(friday),
+    sundayDateStr: getLocalDateString(sunday),
+  };
+}
+
 function isAllowedWindow(now = new Date()) {
   // JS getDay(): 4 = Thursday, 5 = Friday
   const day = now.getDay();
@@ -58,18 +69,18 @@ function isLeaveForDate(leaveObj, targetDateStr) {
 }
 
 async function checkCamuSubmittedToday() {
-  const todayStr = getLocalDateString();
+  const { fridayDateStr, sundayDateStr } = getWeekendDates();
   const { fetchedProfile, lastSubmittedDate } = await chrome.storage.local.get([
     'fetchedProfile',
     'lastSubmittedDate',
   ]);
-  if (lastSubmittedDate === todayStr) {
+  if (lastSubmittedDate === fridayDateStr) {
     await updateActionBadge(true);
-    return { submittedToday: true, source: 'local' };
+    return { submittedToday: true, weekendDate: fridayDateStr, source: 'local' };
   }
   if (!fetchedProfile?.studentId) {
     await updateActionBadge(false);
-    return { submittedToday: false, source: 'no_profile' };
+    return { submittedToday: false, weekendDate: fridayDateStr, source: 'no_profile' };
   }
 
   try {
@@ -78,22 +89,22 @@ async function checkCamuSubmittedToday() {
       isFrmReact: true,
     });
     const existingLeaves = findFirstArrayOfObjects(leavesRes);
-    const foundToday = existingLeaves.some(
-      (lv) => isGatePassEntry(lv) && isLeaveForDate(lv, todayStr)
+    const foundWeekend = existingLeaves.some(
+      (lv) => isGatePassEntry(lv) && isLeaveForDate(lv, fridayDateStr)
     );
-    if (foundToday) {
+    if (foundWeekend) {
       await chrome.storage.local.set({
-        lastSubmittedDate: todayStr,
-        lastStatus: `Submitted in Camu (${todayStr})`,
+        lastSubmittedDate: fridayDateStr,
+        lastStatus: `Submitted for Fri ${fridayDateStr} → Sun ${sundayDateStr}`,
       });
       await updateActionBadge(true);
-      return { submittedToday: true, source: 'camu_api' };
+      return { submittedToday: true, weekendDate: fridayDateStr, source: 'camu_api' };
     }
     await updateActionBadge(false);
-    return { submittedToday: false, source: 'camu_api' };
+    return { submittedToday: false, weekendDate: fridayDateStr, source: 'camu_api' };
   } catch (_) {
     await updateActionBadge(false);
-    return { submittedToday: false, source: 'error' };
+    return { submittedToday: false, weekendDate: fridayDateStr, source: 'error' };
   }
 }
 
@@ -309,25 +320,25 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     return { ok: false, message: msg };
   }
 
-  const todayStr = getLocalDateString();
-  if (!manual && !dryRun && config.lastSubmittedDate === todayStr) {
-    return { ok: true, skipped: true, message: `Already submitted today (${todayStr}).` };
+  const { fridayDateStr, sundayDateStr } = getWeekendDates();
+  if (!manual && !dryRun && config.lastSubmittedDate === fridayDateStr) {
+    return { ok: true, skipped: true, message: `Already submitted for Fri ${fridayDateStr} → Sun ${sundayDateStr}.` };
   }
 
   try {
-    // 1. Verify active Camu session & check for existing passes today
+    // 1. Verify active Camu session & check for existing weekend gate pass (Friday out-date)
     const leavesRes = await camuPost('/api/Leave/getAllleave/', {
       StuID: profile.studentId,
       isFrmReact: true,
     });
     const existingLeaves = findFirstArrayOfObjects(leavesRes);
     const alreadyExists = existingLeaves.some(
-      (lv) => isGatePassEntry(lv) && isLeaveForDate(lv, todayStr)
+      (lv) => isGatePassEntry(lv) && isLeaveForDate(lv, fridayDateStr)
     );
     if (alreadyExists && !dryRun) {
-      const existsMsg = `Gate pass already exists in Camu for ${todayStr} (skipped duplicate).`;
+      const existsMsg = `Weekend gate pass already exists for Fri ${fridayDateStr} → Sun ${sundayDateStr}.`;
       await chrome.storage.local.set({
-        lastSubmittedDate: todayStr,
+        lastSubmittedDate: fridayDateStr,
         lastStatus: existsMsg,
       });
       await updateActionBadge(true);
@@ -349,7 +360,7 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
 
     const payload = {
       Attachments: [],
-      FrDt: `${todayStr}T00:00:00.000Z`,
+      FrDt: `${fridayDateStr}T00:00:00.000Z`,
       GateOutPass: resolvedType.gateOutPassVal,
       HstleReq: 'true',
       InId: profile.institutionId || '',
@@ -360,20 +371,19 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
       PtAb: '',
       Rson: '',
       Sson: '',
-      ToDt: `${todayStr}T00:00:00.000Z`,
+      ToDt: `${sundayDateStr}T00:00:00.000Z`,
       atcmnt: [],
-      frdt: buildUtcIso(todayStr, outTime),
+      frdt: buildUtcIso(fridayDateStr, outTime),
       loggedInId: profile.loggedInId || profile.studentId,
       passTy: resolvedType.id,
       periods: [],
       rson: config.reason || 'Outing',
       timezoneOffSet: 330,
-      todt: buildUtcIso(todayStr, inTime),
+      todt: buildUtcIso(sundayDateStr, inTime),
     };
 
     if (dryRun) {
-      const sampleStr = resolvedType.rawSample ? JSON.stringify(resolvedType.rawSample) : 'none';
-      const msg = `Dry-run OK: passTy="${resolvedType.id}" | types=[${resolvedType.allLabels.join(', ')}] | sample=${sampleStr}`;
+      const msg = `Dry-run OK: ${resolvedType.label || resolvedType.id} (${resolvedType.id}) for Fri ${fridayDateStr} (${outTime}) → Sun ${sundayDateStr} (${inTime}).`;
       await chrome.storage.local.set({
         lastStatus: msg,
         lastRunAt: new Date().toISOString(),
@@ -384,9 +394,9 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     // 3. Silent POST to /api/Leave/crtLv
     await camuPost('/api/Leave/crtLv', payload);
 
-    const okMsg = `Submitted silently (${todayStr} ${outTime}–${inTime})`;
+    const okMsg = `Submitted: Fri ${fridayDateStr} (${outTime}) → Sun ${sundayDateStr} (${inTime})`;
     await chrome.storage.local.set({
-      lastSubmittedDate: todayStr,
+      lastSubmittedDate: fridayDateStr,
       lastStatus: okMsg,
       lastRunAt: new Date().toISOString(),
     });
