@@ -93,6 +93,8 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v0.1.5` — Beta 1.5):**
+  - Hardened automatic triggers in `extension/background.js`: added `chrome.windows.onCreated` (for macOS Dock re-launches where `onStartup` doesn't fire), explicit `delayInMinutes: 15` on `chrome.alarms`, and top-level `ensureAlarm()` on service worker wake.
 - **2026-11-27 (`v0.1.4` — Beta 1.4):**
   - Updated `isCancelledOrRejected()` in `extension/background.js` to detect Camu's abbreviated status codes (`status: "CNCL"`, `"EXP"`, `"REJ"`, `"DEL"`, `"WD"`) and `CancelBool === true`.
   - Updated `isGatePassEntry()` and `resolvePassType()` to recognize `isGatepass: true` and `passTyCode: "WEEK_END_PASS"`.

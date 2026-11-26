@@ -151,7 +151,10 @@ async function syncToolbarBadge() {
 async function ensureAlarm() {
   const existing = await chrome.alarms.get(ALARM_NAME);
   if (!existing) {
-    await chrome.alarms.create(ALARM_NAME, { periodInMinutes: 15 });
+    await chrome.alarms.create(ALARM_NAME, {
+      delayInMinutes: 15,
+      periodInMinutes: 15,
+    });
   }
 }
 
@@ -474,12 +477,25 @@ chrome.runtime.onStartup.addListener(async () => {
   await checkScheduleAndRun();
 });
 
+// On macOS, reopening Chrome from the Dock creates a window without firing onStartup
+chrome.windows.onCreated.addListener(async () => {
+  const wins = await chrome.windows.getAll();
+  if (wins.length === 1) {
+    await ensureAlarm();
+    await syncToolbarBadge();
+    await checkScheduleAndRun();
+  }
+});
+
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_NAME) {
     await syncToolbarBadge();
     await checkScheduleAndRun();
   }
 });
+
+// Ensure the 15-minute alarm stays registered whenever the service worker wakes up
+ensureAlarm();
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
