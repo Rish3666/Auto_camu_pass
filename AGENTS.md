@@ -1,0 +1,95 @@
+# AGENTS.md — Auto Camu Pass Engineering & Handoff Guide
+
+> **Living Document:** Update this file whenever architecture, selectors, release versions, or open tasks change. Any new contributor or AI agent should read this file first before making edits.
+
+---
+
+## 1. Project Overview
+**Goal:** Automate weekly Gate Pass submissions on `https://student.camu.in/v2/profile` every **Tuesday between 09:00 and 23:00 (local/IST)** so students don't have to submit manually.
+
+The repository supports **three independent delivery modes** sharing the same core goal:
+1. **Chrome Extension (`extension/`)** — *Primary self-service mode for friends.* Runs locally in each user's browser via Manifest V3 (`chrome.alarms` + `chrome.storage.local`). Zero server cost, zero shared passwords.
+2. **Self-Service Telegram Bot (`telegram_bot.py` + `db.py`)** — 24/7 bot with encrypted SQLite (`CAMU_SECRET_KEY`) for users whose laptops are off all Tuesday.
+3. **GitHub Actions Batch Runner (`runner.py` + `.github/workflows/weekly_batch.yml`)** — Scheduled Tuesday cloud cron for a managed `users.json` / `users.enc` roster.
+
+---
+
+## 2. Repository Map
+
+| Path | Purpose |
+| :--- | :--- |
+| `extension/manifest.json` | Manifest V3 definition (`alarms`, `storage`, `tabs`, `scripting`, `notifications`, `https://student.camu.in/*`). |
+| `extension/background.js` | Service worker: 15-min alarm, Tuesday 09:00–23:00 check, `lastSubmittedDate` dedup, background tab runner. |
+| `extension/content.js` | Injected DOM automation: login, Gate Pass navigation, form fill, submit / dry-run. |
+| `extension/popup/` | Extension popup UI (`popup.html`, `popup.css`, `popup.js`) for local settings & manual triggers. |
+| `camu_client.py` | Playwright automation worker (`submit_gatepass_for_user`) with isolated `browser.new_context()` per user. |
+| `runner.py` | Multi-user batch orchestrator with 15–45s staggered jitter and fault isolation. |
+| `crypto_helper.py` | AES/Fernet keygen & encryption CLI for `users.json` → `users.enc`. |
+| `db.py` | Encrypted SQLite CRUD (`upsert_user`, `get_user`, `set_enabled`, `delete_user`, `list_active_users`). |
+| `telegram_bot.py` | `python-telegram-bot` v21+ self-service bot (`/register`, `/test`, `/submit`, `/pause`, `/resume`, `/delete`) + Tuesday `job_queue`. |
+| `notifier.py` | Discord webhook & Telegram batch summary reporter. |
+| `.github/workflows/weekly_batch.yml` | Tuesday 04:30 UTC (10:00 AM IST) batch runner + `workflow_dispatch` dry-run. |
+| `.github/workflows/release_extension.yml` | Packages `extension/` into a `.zip` and attaches it to GitHub Releases on `v*` tags. |
+| `tests/` | `pytest` unit tests (`test_core.py`, `test_db.py`). |
+
+---
+
+## 3. Development & Testing Rules
+
+### Environment Setup
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Mandatory Checks Before Pushing
+1. **Run unit tests:**
+   ```bash
+   pytest -v
+   ```
+2. **Validate Chrome Extension manifest:**
+   ```bash
+   python3 -m json.tool extension/manifest.json > /dev/null
+   ```
+3. **Security / Secrets hygiene:**
+   - Never commit `users.json`, `.env`, `*.key`, `data/`, or `screenshots/`.
+   - In `extension/`, never use `eval()`, inline `<script>`, or `.then()` chains (always `async/await` per Manifest V3 rules).
+   - Never store mutable state in `extension/background.js` global variables—persist everything in `chrome.storage.local`.
+
+---
+
+## 4. Release Process (Chrome Extension)
+Friends download the extension directly from **GitHub Releases** (no `git clone` required).
+
+To publish a new extension release:
+1. Bump `"version"` in `extension/manifest.json`.
+2. Update the **Changelog** section at the bottom of this file.
+3. Commit and push to `main`, then create and push a version tag (e.g. `v1.0.1`):
+   ```bash
+   git tag v1.0.1
+   git push origin v1.0.1
+   ```
+   `.github/workflows/release_extension.yml` will automatically zip `extension/` and publish the GitHub Release.
+
+---
+
+## 5. Current Status & Open Tasks (Next Agent Priorities)
+
+- [ ] **Verify Live Camu DOM Selectors (`HIGH PRIORITY`):**
+  - Both `extension/content.js` (`SELECTORS`) and `camu_client.py` (`SELECTORS`) use generic/best-guess selectors for `student.camu.in/v2/profile` because live credentials were not available during initial scaffolding.
+  - **Next step:** Run `Dry-Run Test` in the extension (or `python runner.py --dry-run --headed`), inspect the actual Camu DOM / Network tab, and lock in exact selectors (or switch `content.js` to direct `fetch()` against Camu's internal gate pass API if cleaner).
+- [ ] **Add Extension Icons:**
+  - `extension/manifest.json` currently omits `"icons"` so Chrome uses its default icon cleanly. Generate `16x16`, `48x48`, and `128x128` PNG icons in `extension/icons/` and wire them up.
+- [ ] **OTP / CAPTCHA Handling (if applicable):**
+  - Confirm whether the target college's Camu login uses OTP or CAPTCHA. If yes, adjust `extension/content.js` to reuse an existing logged-in Camu session rather than re-authenticating.
+
+---
+
+## 6. Changelog (Keep Updated)
+
+- **2026-11-26 (`v1.0.0`):**
+  - Initialized repo with Playwright multi-user runner (`runner.py`, `camu_client.py`, `crypto_helper.py`, `notifier.py`).
+  - Added self-service encrypted Telegram bot (`telegram_bot.py`, `db.py`).
+  - Added Manifest V3 Chrome Extension (`extension/`) with `chrome.alarms` Tuesday scheduler and popup UI.
+  - Packaged `v1.0.0` extension `.zip` to GitHub Releases and created `AGENTS.md`.

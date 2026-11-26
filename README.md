@@ -15,10 +15,10 @@ Includes **three ways** to run it—choose what fits best:
 Each friend installs the extension in Chrome/Brave/Edge, saves their own credentials locally (`chrome.storage.local`), and never shares passwords with anyone.
 
 ### How Friends Install & Use It
-1. Download or clone this repo (or download the `extension/` folder).
+1. Download `auto-camu-pass-extension-v1.0.0.zip` from the **[Releases](../../releases)** page and unzip it.
 2. Open Chrome and go to `chrome://extensions`.
 3. Enable **Developer mode** (top-right toggle).
-4. Click **Load unpacked** and select the `extension/` folder.
+4. Click **Load unpacked** and select the unzipped folder.
 5. Click the **Auto Camu Pass** extension icon:
    - Toggle **Auto-submit on Tuesdays** ON.
    - Enter Camu username, password, pass type, reason, and out/in times.
