@@ -111,8 +111,10 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
     });
 
     const statusText = response?.message || 'Completed.';
+    const baseUpdates = response?.profile ? { fetchedProfile: response.profile } : {};
     if (response?.ok) {
       const updates = {
+        ...baseUpdates,
         lastStatus: dryRun ? `Dry-run OK (${todayStr})` : `Submitted (${todayStr})`,
         lastRunAt: new Date().toISOString(),
       };
@@ -123,6 +125,7 @@ async function runGatePassSubmission({ dryRun = false, manual = false } = {}) {
       await showNotification('Auto Camu Pass', updates.lastStatus);
     } else {
       await chrome.storage.local.set({
+        ...baseUpdates,
         lastStatus: `Failed: ${statusText}`,
         lastRunAt: new Date().toISOString(),
       });

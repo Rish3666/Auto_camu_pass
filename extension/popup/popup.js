@@ -4,8 +4,19 @@ function setBanner(text) {
   document.getElementById('status-banner').textContent = text;
 }
 
+function setProfileBanner(profile) {
+  const el = document.getElementById('profile-banner');
+  if (!profile || (!profile.name && !profile.rollNo && !profile.studentId)) {
+    el.style.display = 'none';
+    return;
+  }
+  const parts = [profile.name, profile.rollNo || profile.studentId, profile.phone].filter(Boolean);
+  el.textContent = `Camu Profile: ${parts.join(' • ')}`;
+  el.style.display = 'block';
+}
+
 async function loadSettings() {
-  const data = await chrome.storage.local.get([...FIELDS, 'lastStatus']);
+  const data = await chrome.storage.local.get([...FIELDS, 'lastStatus', 'fetchedProfile']);
   document.getElementById('enabled').checked = data.enabled ?? true;
   document.getElementById('username').value = data.username || '';
   document.getElementById('password').value = data.password || '';
@@ -17,6 +28,7 @@ async function loadSettings() {
   if (data.lastStatus) {
     setBanner(data.lastStatus);
   }
+  setProfileBanner(data.fetchedProfile);
 }
 
 async function saveSettings(event) {
@@ -45,6 +57,7 @@ async function triggerRun(dryRun) {
   try {
     const res = await chrome.runtime.sendMessage({ action: 'RUN_NOW', dryRun });
     setBanner(res?.message || 'Done.');
+    if (res?.profile) setProfileBanner(res.profile);
   } catch (err) {
     setBanner(`Error: ${err.message}`);
   } finally {

@@ -88,8 +88,7 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
-- **2026-11-26 (`v1.0.0`):**
-  - Initialized repo with Playwright multi-user runner (`runner.py`, `camu_client.py`, `crypto_helper.py`, `notifier.py`).
-  - Added self-service encrypted Telegram bot (`telegram_bot.py`, `db.py`).
-  - Added Manifest V3 Chrome Extension (`extension/`) with `chrome.alarms` Tuesday scheduler and popup UI.
-  - Packaged `v1.0.0` extension `.zip` to GitHub Releases and created `AGENTS.md`.
+- **2026-11-26 (`v1.0.0-alpha.1`):**
+  - Marked extension release as **Alpha** (`prerelease: true` for `alpha`/`beta` tags in `.github/workflows/release_extension.yml`, `version_name: "1.0.0-alpha.1"` in `manifest.json`).
+  - Added automatic student profile extraction from the logged-in Camu session (`extractStudentDetailsFromSession()` in `extension/content.js`) to auto-fill student name, ID/roll number, phone, and parent contact into Gate Pass forms and display the fetched profile in the popup.
+  - Initialized Playwright multi-user runner (`runner.py`, `camu_client.py`, `crypto_helper.py`, `notifier.py`), self-service encrypted Telegram bot (`telegram_bot.py`, `db.py`), Manifest V3 Chrome Extension (`extension/`), and `AGENTS.md`.
