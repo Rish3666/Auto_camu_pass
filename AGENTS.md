@@ -65,7 +65,10 @@ Friends download the extension directly from **GitHub Releases** (no `git clone`
 - **Versioning Scheme:**
   - `0.0.x` — Alpha releases (pre-release)
   - `0.1.x` — Beta releases (pre-release)
-  - `1.0.0+` — Stable releases
+  - `1.1.5+` — Stable releases:
+    - **Small updates / fixes:** `1.1.x` (increment 3rd digit, e.g. `1.1.6`, `1.1.7`)
+    - **Medium updates / features:** `1.x.5` (increment 2nd digit, e.g. `1.2.5`, `1.3.5`)
+    - **Major updates / rewrites:** `x.1.5` (increment 1st digit, e.g. `2.1.5`, `3.1.5`)
 
 To publish a new extension release:
 1. Bump `"version"` in `extension/manifest.json`.
@@ -93,6 +96,9 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v1.1.5` — Stable):**
+  - Promoted `v0.1.6` (3 separate daily Fri/Sat/Sun `06:00–22:00` Weekend Gate Passes) to the first **Stable** release (`v1.1.5`).
+  - Documented stable versioning rules (`1.1.x` small, `1.x.5` medium, `x.1.5` major) in `AGENTS.md`.
 - **2026-11-27 (`v0.1.6` — Beta 1.6):**
   - Updated `extension/background.js` and `extension/popup/*` to submit **3 separate single-day Weekend Gate Passes** (Friday `06:00–22:00`, Saturday `06:00–22:00`, Sunday `06:00–22:00`), only submitting missing days and showing `Submitted` / `OK` badge once all 3 days exist in Camu.
   - Changed default `outTime` to `06:00` and `inTime` to `22:00`.
