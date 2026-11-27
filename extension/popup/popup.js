@@ -33,17 +33,17 @@ function getLocalDateString(now = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-function getWeekendFridayString(now = new Date()) {
+function getWeekendKey(now = new Date()) {
   const day = now.getDay();
   const daysUntilFriday = day === 5 ? 0 : (5 - day + 7) % 7;
   const friday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilFriday);
-  return getLocalDateString(friday);
+  return `${getLocalDateString(friday)}:all3`;
 }
 
 function renderSubmittedPin(lastSubmittedDate) {
   const pin = document.getElementById('submitted-pin');
   const text = document.getElementById('submitted-pin-text');
-  const isSubmittedWeekend = lastSubmittedDate === getWeekendFridayString();
+  const isSubmittedWeekend = lastSubmittedDate === getWeekendKey();
   pin.className = `badge ${isSubmittedWeekend ? 'badge-submitted' : 'badge-pending'}`;
   text.textContent = isSubmittedWeekend ? 'Submitted' : 'Not submitted';
 }
@@ -63,8 +63,8 @@ async function loadSettings() {
     !data.passType || data.passType === 'Day Outing' ? 'Week End Gate Pass' : data.passType;
   document.getElementById('passType').value = savedPassType;
   document.getElementById('reason').value = data.reason || 'Outing';
-  document.getElementById('outTime').value = data.outTime || '10:00';
-  document.getElementById('inTime').value = data.inTime || '20:00';
+  document.getElementById('outTime').value = data.outTime || '06:00';
+  document.getElementById('inTime').value = data.inTime || '22:00';
 
   if (data.lastStatus) {
     setBanner(data.lastStatus);
@@ -75,9 +75,9 @@ async function loadSettings() {
   try {
     const live = await chrome.runtime.sendMessage({ action: 'CHECK_TODAY_STATUS' });
     if (live?.submittedToday) {
-      renderSubmittedPin(live.weekendDate || getWeekendFridayString());
+      renderSubmittedPin(live.weekendDate || getWeekendKey());
       if (live.source === 'camu_api') {
-        setBanner(`Submitted in Camu (Fri ${live.weekendDate || getWeekendFridayString()})`);
+        setBanner('Submitted all 3 days (Fri, Sat, Sun)');
       }
     } else if (live && !live.submittedToday && live.source === 'camu_api') {
       renderSubmittedPin('');
@@ -104,8 +104,8 @@ async function saveSettings(event) {
     enabled: document.getElementById('enabled').checked,
     passType: document.getElementById('passType').value.trim() || 'Week End Gate Pass',
     reason: document.getElementById('reason').value.trim() || 'Outing',
-    outTime: document.getElementById('outTime').value || '10:00',
-    inTime: document.getElementById('inTime').value || '20:00',
+    outTime: document.getElementById('outTime').value || '06:00',
+    inTime: document.getElementById('inTime').value || '22:00',
   };
 
   await chrome.storage.local.set(payload);
@@ -137,7 +137,7 @@ async function triggerRun(dryRun) {
   try {
     const res = await chrome.runtime.sendMessage({ action: 'RUN_NOW', dryRun });
     if (res?.profile) renderProfile(res.profile);
-    if (res?.submittedToday) renderSubmittedPin(getWeekendFridayString());
+    if (res?.submittedToday) renderSubmittedPin(getWeekendKey());
     setBanner(res?.message || 'Done.');
   } catch (err) {
     setBanner(`Error: ${err.message}`);

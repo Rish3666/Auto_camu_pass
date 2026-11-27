@@ -93,6 +93,9 @@ To publish a new extension release:
 
 ## 6. Changelog (Keep Updated)
 
+- **2026-11-27 (`v0.1.6` — Beta 1.6):**
+  - Updated `extension/background.js` and `extension/popup/*` to submit **3 separate single-day Weekend Gate Passes** (Friday `06:00–22:00`, Saturday `06:00–22:00`, Sunday `06:00–22:00`), only submitting missing days and showing `Submitted` / `OK` badge once all 3 days exist in Camu.
+  - Changed default `outTime` to `06:00` and `inTime` to `22:00`.
 - **2026-11-27 (`v0.1.5` — Beta 1.5):**
   - Hardened automatic triggers in `extension/background.js`: added `chrome.windows.onCreated` (for macOS Dock re-launches where `onStartup` doesn't fire), explicit `delayInMinutes: 15` on `chrome.alarms`, and top-level `ensureAlarm()` on service worker wake.
 - **2026-11-27 (`v0.1.4` — Beta 1.4):**
