@@ -31,7 +31,15 @@ Each friend installs the extension in Chrome/Brave/Edge, saves their own credent
 
 ## 2. Self-Service Telegram Bot (24/7 Cloud)
 
-Friends message your bot with `/register`, `/status` (with inline quick-action buttons), `/test`, `/submit`, `/pause`, `/resume`, `/delete`.
+Friends manage and submit their Camu gate passes directly from Telegram (using Camu's JSON REST API `crtLv` with encrypted SQLite credentials):
+
+- `/register` — Guided setup with clickable quick-pick buttons for pass type (`Week End Gate Pass`), reason (`Weekend outing`, `Festival outing`, `Emergency outing`), and out/in time (`06:00 – 20:00`)
+- `/update` — Update any individual setting (name, Camu login, pass type, reason, or time) without re-registering
+- `/fill` — Fill & submit a **same-day outing for today** (defaults to **10 minutes from now → 8:00 PM**, or custom `HH:MM HH:MM` times)
+- `/submit` — Immediately submit your **weekend gate pass** (`Friday → Sunday`) using your saved defaults
+- `/status` — View your profile, last run status, and inline quick-action buttons
+- `/test` — Dry-run verification against Camu's JSON API (no submission)
+- `/pause`, `/resume`, `/delete`, `/cancel` — Manage or remove your account
 
 ```bash
 cp .env.example .env
